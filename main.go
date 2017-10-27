@@ -11,25 +11,29 @@ import (
 	"github.com/buger/jsonparser"
 )
 
-func readLine(path string, ch chan string) {
-	defer close(ch)
-	inFile, err := os.Open(path)
-	if err != nil {
-		log.Fatalf("Unable to open input: %s", path)
-	}
-	defer inFile.Close()
-	scanner := bufio.NewScanner(inFile)
-	scanner.Split(bufio.ScanLines)
-
-	for scanner.Scan() {
-		data := scanner.Bytes()
-		container, _ := jsonparser.GetString(data, "container")
-		if container != "plans-app-production" {
-			continue
+func readLine(path string) chan string {
+	ch := make(chan string, 50)
+	go func(path string, ch chan string) {
+		defer close(ch)
+		inFile, err := os.Open(path)
+		if err != nil {
+			log.Fatalf("Unable to open input: %s", path)
 		}
-		line, _ := jsonparser.GetString(data, "_line")
-		ch <- line
-	}
+		defer inFile.Close()
+		scanner := bufio.NewScanner(inFile)
+		scanner.Split(bufio.ScanLines)
+
+		for scanner.Scan() {
+			data := scanner.Bytes()
+			container, _ := jsonparser.GetString(data, "container")
+			if container != "plans-app-production" {
+				continue
+			}
+			line, _ := jsonparser.GetString(data, "_line")
+			ch <- line
+		}
+	}(path, ch)
+	return ch
 }
 
 func processLine(path string, ch chan string) {
@@ -54,7 +58,6 @@ func main() {
 	}
 	inFile := os.Args[1]
 	outFile := os.Args[2]
-	ch := make(chan string, 50)
-	go readLine(inFile, ch)
+	ch := readLine(inFile)
 	processLine(outFile, ch)
 }
