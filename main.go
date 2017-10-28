@@ -2,11 +2,13 @@ package main
 
 import (
 	"bufio"
+	"compress/gzip"
 	"encoding/csv"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -25,8 +27,12 @@ type AWS struct {
 	Bucket    string
 	LogPrefix string
 }
+type Storage struct {
+	LogDirectory string
+}
 type Config struct {
-	AWS AWS
+	AWS     AWS
+	Storage Storage
 }
 
 func readConfig(path string, cfg *Config) {
@@ -45,9 +51,14 @@ func readLine(path string) chan string {
 		if err != nil {
 			log.Fatalf("Unable to open input: %s", path)
 		}
+		gz, err := gzip.NewReader(inFile)
+
+		if err != nil {
+			log.Fatal(err)
+		}
 		defer inFile.Close()
-		scanner := bufio.NewScanner(inFile)
-		scanner.Split(bufio.ScanLines)
+		defer gz.Close()
+		scanner := bufio.NewScanner(gz)
 
 		for scanner.Scan() {
 			data := scanner.Bytes()
@@ -78,8 +89,13 @@ func processLine(path string, ch chan string) {
 }
 
 func getLogfile(cfg *Config, logDate string) (logName string) {
+	// create local directory
+	newpath := filepath.Join(cfg.Storage.LogDirectory)
+	os.MkdirAll(newpath, os.ModePerm)
+
 	d, _ := time.Parse("2006-01-02", logDate)
 	logName = cfg.AWS.LogPrefix + "." + logDate + ".json.gz"
+	localLogName := filepath.Join(cfg.Storage.LogDirectory, logName)
 	item := d.Format("2006/01/") + logName
 
 	awsCfg := &aws.Config{
@@ -101,7 +117,7 @@ func getLogfile(cfg *Config, logDate string) (logName string) {
 	log.Printf("File in S3 is %f GB", float64(*ob.ContentLength)/1024/1024/1024)
 
 	downloadFile := true
-	if file, err := os.Open(logName); err == nil {
+	if file, err := os.Open(localLogName); err == nil {
 		stat, _ := file.Stat()
 		// if file on disk is same size don't download
 		downloadFile = stat.Size() != sizeInS3
@@ -112,7 +128,7 @@ func getLogfile(cfg *Config, logDate string) (logName string) {
 		log.Printf("Downloading from S3")
 		downloader := s3manager.NewDownloader(sess)
 
-		file, err := os.Create(logName)
+		file, err := os.Create(localLogName)
 		if err != nil {
 			log.Fatalf("Unable to open file %q, %v", item, err)
 		}
@@ -127,22 +143,21 @@ func getLogfile(cfg *Config, logDate string) (logName string) {
 	} else {
 		log.Printf("Skipping Download")
 	}
-	return logName
+	return localLogName
 }
 
 func main() {
 	cfg := &Config{}
 	readConfig("dnaquery.toml", cfg)
 
-	logName := getLogfile(cfg, "2017-08-06")
-	fmt.Println(logName)
+	if len(os.Args) != 3 {
+		fmt.Printf("Usage: %s date outfile\n", os.Args[0])
+		return
+	}
+	dateToProcess := os.Args[1]
+	outFile := os.Args[2]
+	logName := getLogfile(cfg, dateToProcess)
 
-	// if len(os.Args) != 3 {
-	// 	fmt.Printf("Usage: %s infile outfile\n", os.Args[0])
-	// 	return
-	// }
-	// inFile := os.Args[1]
-	// outFile := os.Args[2]
-	// ch := readLine(inFile)
-	// processLine(outFile, ch)
+	ch := readLine(logName)
+	processLine(outFile, ch)
 }

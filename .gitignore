@@ -9,3 +9,4 @@ dnaquery.toml
 
 # Golang project vendor packages which should be ignored
 vendor/
+logs/
