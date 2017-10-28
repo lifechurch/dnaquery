@@ -1,0 +1,5 @@
+[aws]
+Key = "key123123123132"
+Secret = "secret123123123123"
+Bucket = "logs"
+LogPrefix = "a7112abc9d"
