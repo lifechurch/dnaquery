@@ -47,6 +47,7 @@ func readLine(path string) chan string {
 	ch := make(chan string, 50)
 	go func(path string, ch chan string) {
 		defer close(ch)
+		log.Println("Opening Logfile", path)
 		inFile, err := os.Open(path)
 		if err != nil {
 			log.Fatalf("Unable to open input: %s", path)
@@ -58,8 +59,9 @@ func readLine(path string) chan string {
 		}
 		defer inFile.Close()
 		defer gz.Close()
-		scanner := bufio.NewScanner(gz)
 
+		scanner := bufio.NewScanner(gz)
+		log.Println("Scanning logfile")
 		for scanner.Scan() {
 			data := scanner.Bytes()
 			container, _ := jsonparser.GetString(data, "container")
@@ -69,6 +71,7 @@ func readLine(path string) chan string {
 			line, _ := jsonparser.GetString(data, "_line")
 			ch <- line
 		}
+		log.Println("Scanning complete")
 	}(path, ch)
 	return ch
 }
