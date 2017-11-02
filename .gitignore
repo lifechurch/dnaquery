@@ -1,5 +1,6 @@
 dnaquery
 dnaquery.toml
+gcp_credentials.json
 
 # Test binary, build with `go test -c`
 *.test

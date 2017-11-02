@@ -3,3 +3,25 @@ Key = "key123123123132"
 Secret = "secret123123123123"
 Bucket = "logs"
 LogPrefix = "a7112abc9d"
+
+[storage]
+LogDirectory = 'logs'
+
+[results]
+Directory = "results"
+
+[[containers]]
+    Name = "production-app"
+    Regex = '^([\d.]+) - \[([^\]]*)\] - - \[([^\]]*)\] "([^"]*)" (\d+) (\d+) "([^"]*)" "([^"]*)" (\d+) ([\d.]+) ([\d.:]+) (\d+) ([\d.]+) (\d+)$'
+    TimeGroup = 3
+    TimeFormat = "2/Jan/2006:15:04:05 -0700"
+    [[containers.excludes]]
+        Group = 4
+        Contains = "ping"
+
+[gcp]
+ProjectID = "gcpproj"
+CredentialsFile = "gcp_credentials.json"
+Bucket = "logdna_to_bq"
+Dataset = "logdna"
+TemplateTable = "logdna"
