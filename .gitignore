@@ -11,3 +11,4 @@ gcp_credentials.json
 # Golang project vendor packages which should be ignored
 vendor/
 logs/
+results/
