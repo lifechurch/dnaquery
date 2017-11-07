@@ -133,6 +133,9 @@ func readLine(path string, cfg *Config) chan [2]string {
 			line, _ := jsonparser.GetString(data, "_line")
 			ch <- [2]string{container, line}
 		}
+		if err := scanner.Err(); err != nil {
+			log.Fatalln("Error reading log file:", err.Error())
+		}
 		log.Println("Scanning complete")
 	}(path, ch, cfg)
 	return ch
@@ -146,7 +149,8 @@ func processLine(path string, ch chan [2]string, cfg *Config) {
 	}
 	w := csv.NewWriter(csvOut)
 	defer csvOut.Close()
-
+	nMatches := 0
+	nSkipped := 0
 	for r := range ch {
 		container := r[0]
 		line := r[1]
@@ -160,6 +164,7 @@ func processLine(path string, ch chan [2]string, cfg *Config) {
 		result := c.CompiledRegex.FindStringSubmatch(line)
 		if len(result) == 0 {
 			// log.Println("Found no match for regex in processLine:", container, line)
+			nSkipped++
 			continue
 		}
 		// check exclusion rules
@@ -174,8 +179,10 @@ func processLine(path string, ch chan [2]string, cfg *Config) {
 			}
 		}
 		if exclude {
+			nSkipped++
 			continue
 		}
+		nMatches++
 		// change time format
 		dt, err := time.Parse(c.TimeFormat, result[c.TimeGroup])
 		if err != nil {
@@ -194,6 +201,7 @@ func processLine(path string, ch chan [2]string, cfg *Config) {
 	if err := w.Error(); err != nil {
 		log.Fatalln("Error creates csv", err.Error())
 	}
+	log.Printf("Matched %d lines, Skipped %d lines\n", nMatches, nSkipped)
 	log.Println("Completed processLine")
 }
 
@@ -243,7 +251,6 @@ func getLogfile(cfg *Config, logDate string) (logName string) {
 		defer file.Close()
 
 		numBytes, err := downloader.Download(file, obi)
-
 		if err != nil {
 			log.Fatalf("Unable to download item %q, %v", item, err)
 		}
@@ -319,7 +326,7 @@ func loadInBQ(object string, date string, cfg *Config) {
 	}
 	myDataset := client.Dataset(cfg.GCP.Dataset)
 
-	templateTable := myDataset.Table("template")
+	templateTable := myDataset.Table(cfg.GCP.TemplateTable)
 
 	gscURL := "gs://" + cfg.GCP.Bucket + "/" + object
 	gcsRef := bigquery.NewGCSReference(gscURL)
