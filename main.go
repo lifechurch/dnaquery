@@ -122,8 +122,10 @@ func readLine(path string, cfg *Config) chan [2]string {
 		defer gz.Close()
 
 		scanner := bufio.NewScanner(gz)
-		log.Println("Scanning logfile")
+		log.Println("Scanning log file")
+		lineCount := 0
 		for scanner.Scan() {
+			lineCount++
 			data := scanner.Bytes()
 			container, _ := jsonparser.GetString(data, "container")
 			_, err := cfg.getContainer(container)
@@ -136,7 +138,7 @@ func readLine(path string, cfg *Config) chan [2]string {
 		if err := scanner.Err(); err != nil {
 			log.Fatalln("Error reading log file:", err.Error())
 		}
-		log.Println("Scanning complete")
+		log.Printf("Scanning complete. %d lines scanned\n", lineCount)
 	}(path, ch, cfg)
 	return ch
 }
@@ -182,14 +184,15 @@ func processLine(path string, ch chan [2]string, cfg *Config) {
 			nSkipped++
 			continue
 		}
-		nMatches++
 		// change time format
 		dt, err := time.Parse(c.TimeFormat, result[c.TimeGroup])
 		if err != nil {
-			log.Println("skipping row:", err.Error())
+			// log.Println("skipping row:", err.Error())
+			nSkipped++
 			continue
 		}
 		result[c.TimeGroup] = dt.Format("2006-01-02 15:04:05 -07:00")
+		nMatches++
 		record = append(record, result[1:]...)
 		if err = w.Write(record); err != nil {
 			log.Fatal(err)
