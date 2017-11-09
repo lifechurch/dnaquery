@@ -8,7 +8,6 @@ gcp_credentials.json
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
-# Golang project vendor packages which should be ignored
-vendor/
+
 logs/
 results/
