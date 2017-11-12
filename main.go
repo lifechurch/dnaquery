@@ -99,9 +99,15 @@ func readConfig(path string, cfg *Config) {
 
 func setupDirectories(cfg *Config) {
 	newpath := filepath.Join(cfg.Storage.LogDirectory)
-	os.MkdirAll(newpath, os.ModePerm)
+	err := os.MkdirAll(newpath, os.ModePerm)
+	if err != nil {
+		log.Fatalf("Can't create log dir (%s): %s\n", cfg.Storage.LogDirectory, err.Error())
+	}
 	newpath = filepath.Join(cfg.Results.Directory)
-	os.MkdirAll(newpath, os.ModePerm)
+	err = os.MkdirAll(newpath, os.ModePerm)
+	if err != nil {
+		log.Fatalln("Can't create results dir (%s): %s\n", cfg.Results.Directory, err.Error())
+	}
 }
 
 func readLine(path string, cfg *Config) chan [2]string {
