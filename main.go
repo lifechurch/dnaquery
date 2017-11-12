@@ -37,9 +37,6 @@ type AWS struct {
 type Storage struct {
 	LogDirectory string
 }
-type Results struct {
-	Directory string
-}
 type GCP struct {
 	ProjectID       string
 	CredentialsFile string
@@ -62,7 +59,6 @@ type Container struct {
 type Config struct {
 	AWS        AWS
 	Storage    Storage
-	Results    Results
 	GCP        GCP
 	Containers []Container
 }
@@ -101,10 +97,6 @@ func setupDirectories(cfg *Config) {
 	err := os.MkdirAll(cfg.Storage.LogDirectory, os.ModePerm)
 	if err != nil {
 		log.Fatalf("Can't create log dir (%s): %s\n", cfg.Storage.LogDirectory, err.Error())
-	}
-	err = os.MkdirAll(cfg.Results.Directory, os.ModePerm)
-	if err != nil {
-		log.Fatalln("Can't create results dir (%s): %s\n", cfg.Results.Directory, err.Error())
 	}
 }
 
@@ -378,8 +370,8 @@ func main() {
 	readConfig("dnaquery.toml", cfg)
 	cfg.compileRegexes()
 	dateToProcess := os.Args[1]
-	outFile := "results_" + dateToProcess
-	outPath := filepath.Join(cfg.Results.Directory, outFile)
+	outFile := "results_" + dateToProcess + ".csv"
+	outPath := filepath.Join(cfg.Storage.LogDirectory, outFile)
 
 	setupDirectories(cfg)
 

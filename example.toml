@@ -7,9 +7,6 @@ LogPrefix = "a7112abc9d"
 [storage]
 LogDirectory = 'logs'
 
-[results]
-Directory = "results"
-
 [[containers]]
     Name = "production-app"
     Regex = '^([\d.]+) - \[([^\]]*)\] - - \[([^\]]*)\] "([^"]*)" (\d+) (\d+) "([^"]*)" "([^"]*)" (\d+) ([\d.]+) ([\d.:]+) (\d+) ([\d.]+) (\d+)$'
