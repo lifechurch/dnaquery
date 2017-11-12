@@ -377,16 +377,17 @@ func main() {
 	cfg := &Config{}
 	readConfig("dnaquery.toml", cfg)
 	cfg.compileRegexes()
-
 	dateToProcess := os.Args[1]
 	outFile := "results_" + dateToProcess
-	logName := getLogfile(cfg, dateToProcess)
+	outPath := filepath.Join(cfg.Results.Directory, outFile)
 
 	setupDirectories(cfg)
 
-	outPath := filepath.Join(cfg.Results.Directory, outFile)
+	logName := getLogfile(cfg, dateToProcess)
+
 	ch := readLine(logName, cfg)
 	processLine(outPath, ch, cfg)
+
 	gcsObject := dateToProcess + "_results.csv"
 	err := uploadToGCS(outPath, gcsObject, cfg)
 	if err != nil {
