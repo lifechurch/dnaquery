@@ -69,7 +69,7 @@ func (cfg *Config) getContainer(c string) (Container, error) {
 			return container, nil
 		}
 	}
-	return Container{}, errors.New("Containter not found")
+	return Container{}, errors.New("Container not found")
 }
 
 func (cfg *Config) compileRegexes() {
@@ -315,7 +315,7 @@ func uploadToGCS(path string, object string, cfg *Config) error {
 
 func loadInBQ(object string, date string, cfg *Config) {
 	date = strings.Replace(date, "-", "_", -1)
-	log.Println("Staring load into BQ")
+	log.Println("Starting load into BQ")
 	ctx := context.Background()
 	client, err := bigquery.NewClient(ctx, cfg.GCP.ProjectID,
 		option.WithCredentialsFile(cfg.GCP.CredentialsFile))
