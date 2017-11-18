@@ -70,10 +70,6 @@ Currently the schema for the BigQuery table is specified by creating a table wit
 
 `dnaquery 2017-11-20`
 
-## Tests
-
-`go test`
-
 ## Dependencies
 
 This project uses [dep](https://github.com/golang/dep) for dependency management
