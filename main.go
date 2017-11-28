@@ -5,7 +5,6 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/csv"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -25,18 +24,24 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/buger/jsonparser"
 	toml "github.com/pelletier/go-toml"
+	"github.com/pkg/errors"
 	"google.golang.org/api/option"
 )
 
+// AWS holds the configuration for [aws] section of the toml config.
 type AWS struct {
 	Key       string
 	Secret    string
 	Bucket    string
 	LogPrefix string
 }
+
+// Storage holds the configuration for [storage] section of the toml config.
 type Storage struct {
 	LogDirectory string
 }
+
+// GCP holds the configuration for [gcp] section of the toml config.
 type GCP struct {
 	ProjectID       string
 	CredentialsFile string
@@ -44,10 +49,16 @@ type GCP struct {
 	Dataset         string
 	TemplateTable   string
 }
+
+// Exclude holds the configuration for the [[containers.excludes]] subsection
+// of the toml config.
 type Exclude struct {
 	Group    int
 	Contains string
 }
+
+// Container holds the configuration for a single entry in the [[containers]]
+// section of the toml config.
 type Container struct {
 	Name          string
 	Regex         string
@@ -56,6 +67,8 @@ type Container struct {
 	TimeFormat    string
 	Excludes      []Exclude
 }
+
+// Config holds the full configation loaded from the toml config file.
 type Config struct {
 	AWS        AWS
 	Storage    Storage
@@ -82,15 +95,16 @@ func (cfg *Config) compileRegexes() {
 	}
 }
 
-func readConfig(path string, cfg *Config) {
+func readConfig(path string, cfg *Config) error {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
-		log.Fatalf("Unable to open config %s: Error: %s", path, err.Error())
+		return errors.Wrap(err, fmt.Sprintf("Unable to open config (%s)", path))
 	}
 	err = toml.Unmarshal(data, cfg)
 	if err != nil {
-		log.Fatalln("Error loading config:", err.Error())
+		return errors.Wrap(err, "Error loading config")
 	}
+	return nil
 }
 
 func setupDirectory(cfg *Config) {
@@ -379,7 +393,10 @@ func main() {
 
 	// load config
 	cfg := &Config{}
-	readConfig("dnaquery.toml", cfg)
+	err := readConfig("dnaquery.toml", cfg)
+	if err != nil {
+		log.Fatal("Problem reading config file", err.Error())
+	}
 	cfg.compileRegexes()
 
 	setupDirectory(cfg)
@@ -393,7 +410,7 @@ func main() {
 	processLine(outPath, ch, cfg)
 
 	gcsObject := dateToProcess + "_results.csv"
-	err := uploadToGCS(outPath, gcsObject, cfg)
+	err = uploadToGCS(outPath, gcsObject, cfg)
 	if err != nil {
 		log.Fatalln("Error uploading to GCS:", err.Error())
 	}
