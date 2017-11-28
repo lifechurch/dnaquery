@@ -58,7 +58,7 @@ Note: the term container here is used to be consistent with LogDNA's terminology
 ```
 [gcp]  # Google Cloud Project settings
 ProjectID = "gcpproj" # name of GCP project
-CredentialsFile = "gcp_credentials.json" # path to the credentials file downloaded from GCP
+CredentialsFile = "gcp_credentials.json" # relative or absolute path to the credentials file downloaded from GCP
 Bucket = "logdna_to_bq" # name of bucket in Google Cloud Storage to save results for ingestion into BigQuery, bucket will need to be created before first run
 Dataset = "logdna" # BigQuery dataset
 TemplateTable = "logdna" # currently DNAQuery uses a template table. More details below.
