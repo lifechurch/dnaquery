@@ -93,10 +93,19 @@ func readConfig(path string, cfg *Config) {
 	}
 }
 
-func setupDirectories(cfg *Config) {
+func setupDirectory(cfg *Config) {
 	err := os.MkdirAll(cfg.Storage.LogDirectory, os.ModePerm)
 	if err != nil {
 		log.Fatalf("Can't create log dir (%s): %s\n", cfg.Storage.LogDirectory, err.Error())
+	}
+}
+
+func cleanupFiles(path ...string) {
+	for _, f := range path {
+		err := os.Remove(f)
+		if err != nil {
+			log.Printf("Unable to delete file (%s): %s", f, err.Error())
+		}
 	}
 }
 
@@ -366,18 +375,21 @@ func main() {
 		fmt.Printf("Usage: %s date\n", os.Args[0])
 		return
 	}
+	dateToProcess := os.Args[1]
+
+	// load config
 	cfg := &Config{}
 	readConfig("dnaquery.toml", cfg)
 	cfg.compileRegexes()
-	dateToProcess := os.Args[1]
-	outFile := "results_" + dateToProcess + ".csv"
-	outPath := filepath.Join(cfg.Storage.LogDirectory, outFile)
 
-	setupDirectories(cfg)
+	setupDirectory(cfg)
 
 	logName := getLogfile(cfg, dateToProcess)
 
 	ch := readLine(logName, cfg)
+
+	outFile := "results_" + dateToProcess + ".csv"
+	outPath := filepath.Join(cfg.Storage.LogDirectory, outFile)
 	processLine(outPath, ch, cfg)
 
 	gcsObject := dateToProcess + "_results.csv"
@@ -386,4 +398,6 @@ func main() {
 		log.Fatalln("Error uploading to GCS:", err.Error())
 	}
 	loadInBQ(gcsObject, dateToProcess, cfg)
+
+	cleanupFiles(logName, outPath)
 }
