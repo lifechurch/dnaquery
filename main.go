@@ -25,6 +25,7 @@ import (
 	"github.com/buger/jsonparser"
 	toml "github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
+	"github.com/urfave/cli"
 	"google.golang.org/api/option"
 )
 
@@ -384,18 +385,20 @@ func loadInBQ(object string, date string, cfg *Config) {
 	log.Println("Completed load into BQ")
 }
 
-func main() {
-	if len(os.Args) != 2 {
-		fmt.Printf("Usage: %s date\n", os.Args[0])
-		return
+func run(c *cli.Context) error {
+	dateToProcess := c.String("date")
+	if dateToProcess == "" {
+		fmt.Print("ERROR: --date required\n\n")
+		cli.ShowAppHelp(c)
+		return errors.New("Error: --date required")
 	}
-	dateToProcess := os.Args[1]
+	configFile := c.String("config")
 
 	// load config
 	cfg := &Config{}
-	err := readConfig("dnaquery.toml", cfg)
+	err := readConfig(configFile, cfg)
 	if err != nil {
-		log.Fatal("Problem reading config file", err.Error())
+		log.Fatalln(err.Error())
 	}
 	cfg.compileRegexes()
 
@@ -417,4 +420,23 @@ func main() {
 	loadInBQ(gcsObject, dateToProcess, cfg)
 
 	cleanupFiles(logName, outPath)
+	return nil
+}
+
+func main() {
+	app := cli.NewApp()
+
+	app.Flags = []cli.Flag{
+		cli.StringFlag{
+			Name:  "config, c",
+			Usage: "Load configuration from `FILE`",
+			Value: "dnaquery.toml",
+		},
+		cli.StringFlag{
+			Name:  "date, d",
+			Usage: "process log archive for `YYYY-MM-DD`",
+		},
+	}
+	app.Action = run
+	app.Run(os.Args)
 }
