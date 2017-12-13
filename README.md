@@ -70,7 +70,7 @@ Currently the schema for the BigQuery table is specified by creating a table wit
 
 ## Usage
 
-`dnaquery 2017-11-20`
+`dnaquery --date 2017-11-20`
 
 ## Dependencies
 
