@@ -1,6 +1,6 @@
 # DNAQuery
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/lifechurch/dnaquery)](https://goreportcard.com/report/github.com/lifechurch/dnaquery) [![Build Status](https://travis-ci.org/lifechurch/dnaquery.svg?branch=cv%2Fcleanup_dirs)](https://travis-ci.org/lifechurch/dnaquery)
+[![Go Report Card](https://goreportcard.com/badge/github.com/lifechurch/dnaquery)](https://goreportcard.com/report/github.com/lifechurch/dnaquery) [![Build Status](https://travis-ci.org/lifechurch/dnaquery.svg?branch=master)](https://travis-ci.org/lifechurch/dnaquery)
 
 DNAQuery is a command line utility to take [LogDNA](https://logdna.com) archives and load them into [BigQuery](https://cloud.google.com/bigquery/). This allows long-term, queryable storage of logs in BigQuery (which is considerably more cost effective). In our use case we want real-time access to lots of different logs, and long-term storage of a subset of those logs. This approach has helped us find a balance between access and cost.
 
