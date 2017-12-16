@@ -3,5 +3,8 @@ language: go
 go:
   - 1.9.x
 
+before_install:
+  - go get github.com/mattn/goveralls
 script:
-  - go test -v ./...
+    # goveralls also runs the test
+  - $GOPATH/bin/goveralls -service=travis-ci -v -race
