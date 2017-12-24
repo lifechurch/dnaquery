@@ -69,7 +69,7 @@ type Container struct {
 	Excludes      []Exclude
 }
 
-// Config holds the full configation loaded from the toml config file.
+// Config holds the full configuration loaded from the toml config file.
 type Config struct {
 	AWS        AWS
 	Storage    Storage
@@ -86,12 +86,9 @@ func (cfg *Config) getContainer(c string) (Container, error) {
 	return Container{}, errors.New("Container not found")
 }
 
-func (cfg *Config) compileRegexes() {
+func (cfg *Config) compileRegex() {
 	for i, c := range cfg.Containers {
-		cmp, err := regexp.Compile(c.Regex)
-		if err != nil {
-			log.Fatalln("Could not compile regex for container:", c.Name)
-		}
+		cmp := regexp.MustCompile(c.Regex)
 		cfg.Containers[i].CompiledRegex = cmp
 	}
 }
@@ -400,7 +397,7 @@ func run(c *cli.Context) error {
 	if err != nil {
 		log.Fatalln(err.Error())
 	}
-	cfg.compileRegexes()
+	cfg.compileRegex()
 
 	setupDirectory(cfg)
 
