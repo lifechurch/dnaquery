@@ -17,6 +17,17 @@ func TestReadConfig(t *testing.T) {
 	if err != nil {
 		t.Error("could not parse toml file when should have", err.Error())
 	}
+	// create bad file
+	f := "bad.toml"
+	f1, err := os.Create(f)
+	f1.Write([]byte("bad toml file"))
+	f1.Close()
+	err = readConfig(f, cfg)
+	if err == nil {
+		t.Errorf("should have error reading bad toml file")
+	}
+	// clean up test file
+	os.Remove(f)
 }
 
 func TestGetContainers(t *testing.T) {
@@ -54,9 +65,26 @@ func TestCleanupFiles(t *testing.T) {
 	cleanupFiles(f1Path, f2Path, f3Path)
 
 	if _, err := os.Stat(f1Path); !os.IsNotExist(err) {
-		t.Fatalf("test file (%s) still exists", f1Path)
+		t.Errorf("test file (%s) still exists", f1Path)
 	}
 	if _, err := os.Stat(f2Path); !os.IsNotExist(err) {
-		t.Fatalf("test file (%s) still exists", f2Path)
+		t.Errorf("test file (%s) still exists", f2Path)
+	}
+}
+
+func TestCompileRegex(t *testing.T) {
+	c1 := Container{
+		Name: "Container 1",
+		Regex: `([\d.]+) - \[([^\]]*)\] - - \[([^\]]*)\]`,
+	}
+	cfg := &Config{
+		Containers: []Container{c1},
+	}
+	if cfg.Containers[0].CompiledRegex != nil {
+		t.Errorf("compile regex is not nil but compile hasn't been called yet")
+	}
+	cfg.compileRegex()
+	if cfg.Containers[0].CompiledRegex == nil {
+		t.Errorf("compile regex is nil")
 	}
 }
