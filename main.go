@@ -105,11 +105,12 @@ func readConfig(path string, cfg *Config) error {
 	return nil
 }
 
-func setupDirectory(cfg *Config) {
+func setupDirectory(cfg *Config) error {
 	err := os.MkdirAll(cfg.Storage.LogDirectory, os.ModePerm)
 	if err != nil {
-		log.Fatalf("Can't create log dir (%s): %s\n", cfg.Storage.LogDirectory, err.Error())
+		err = errors.Wrap(err, fmt.Sprintf("Unable to create dir %s", cfg.Storage.LogDirectory))
 	}
+	return err
 }
 
 func cleanupFiles(path ...string) {
@@ -399,7 +400,10 @@ func run(c *cli.Context) error {
 	}
 	cfg.compileRegex()
 
-	setupDirectory(cfg)
+	err = setupDirectory(cfg)
+	if err != nil {
+		log.Fatalln(err.Error())
+	}
 
 	logName := getLogfile(cfg, dateToProcess)
 

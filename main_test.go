@@ -1,8 +1,12 @@
 package main
 
 import (
+	"crypto/rand"
 	"os"
 	"testing"
+
+	"encoding/hex"
+	"path/filepath"
 
 	"github.com/google/go-cmp/cmp"
 )
@@ -74,7 +78,7 @@ func TestCleanupFiles(t *testing.T) {
 
 func TestCompileRegex(t *testing.T) {
 	c1 := Container{
-		Name: "Container 1",
+		Name:  "Container 1",
 		Regex: `([\d.]+) - \[([^\]]*)\] - - \[([^\]]*)\]`,
 	}
 	cfg := &Config{
@@ -86,5 +90,33 @@ func TestCompileRegex(t *testing.T) {
 	cfg.compileRegex()
 	if cfg.Containers[0].CompiledRegex == nil {
 		t.Errorf("compile regex is nil")
+	}
+}
+
+func TestSetupDir(t *testing.T) {
+	randBytes := make([]byte, 16)
+	rand.Read(randBytes)
+
+	path := filepath.Join(os.TempDir(), hex.EncodeToString(randBytes))
+	cfg := &Config{
+		Storage: Storage{LogDirectory: path},
+	}
+	err := setupDirectory(cfg)
+	if err != nil {
+		t.Errorf("directory setup failed: %v", err)
+	}
+	_, err = os.Stat(path)
+	if os.IsNotExist(err) {
+		t.Errorf("directory does not exist: %v", err)
+	}
+	os.Remove(path)
+
+	path = ""
+	cfg = &Config{
+		Storage: Storage{LogDirectory: path},
+	}
+	err = setupDirectory(cfg)
+	if err == nil {
+		t.Error("should have error creating empty dir")
 	}
 }
