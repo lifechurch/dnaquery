@@ -1,54 +1,33 @@
 package main
 
 import (
-	"crypto/rand"
 	"os"
 	"testing"
-
-	"encoding/hex"
-	"path/filepath"
-
-	"github.com/google/go-cmp/cmp"
+	"io/ioutil"
+	"strings"
+	"time"
 )
 
-func TestReadConfig(t *testing.T) {
-	cfg := &Config{}
-	err := readConfig("doesnotexist.toml", cfg)
+func TestNewDNAQuery(t *testing.T) {
+	_, err := NewDNAQuery(&Configuration{})
 	if err == nil {
-		t.Error("should have returned an error")
+		t.Errorf("should error if 0 Containers in config")
 	}
-	err = readConfig("example.toml", cfg)
-	if err != nil {
-		t.Error("could not parse toml file when should have", err.Error())
-	}
-	// create bad file
-	f := "bad.toml"
-	f1, err := os.Create(f)
-	f1.Write([]byte("bad toml file"))
-	f1.Close()
-	err = readConfig(f, cfg)
-	if err == nil {
-		t.Errorf("should have error reading bad toml file")
-	}
-	// clean up test file
-	os.Remove(f)
-}
-
-func TestGetContainers(t *testing.T) {
-	// build a config with 2 Containers
 	c1 := Container{Name: "Container 1"}
-	cfg := &Config{
+	cfg := &Configuration{
 		Containers: []Container{c1},
 	}
-	_, err := cfg.getContainer("Container That Doesn't Exist")
+	_, err = NewDNAQuery(cfg)
 	if err == nil {
-		t.Errorf("Err not returned when container doesn't exist")
+		t.Errorf("should error if no log directory is specified")
 	}
 
-	c1Retrieved, _ := cfg.getContainer("Container 1")
-	if !cmp.Equal(c1, c1Retrieved) {
-		t.Errorf("c1 was not equal")
+	cfg, err = NewConfiguration("example.toml")
+	dna, err := NewDNAQuery(cfg)
+	if dna == nil {
+		t.Error("dna sould not be nil")
 	}
+
 }
 
 func TestCleanupFiles(t *testing.T) {
@@ -76,47 +55,63 @@ func TestCleanupFiles(t *testing.T) {
 	}
 }
 
-func TestCompileRegex(t *testing.T) {
+func TestProcessLine(t *testing.T) {
 	c1 := Container{
-		Name:  "Container 1",
-		Regex: `([\d.]+) - \[([^\]]*)\] - - \[([^\]]*)\]`,
+		Name: "container1",
+		Regex: `^([\d.]+) \[([^\]]*)\] - "([^"]*)" (\d+)`,
+		TimeGroup: 2,
+		TimeFormat: "2/Jan/2006:15:04:05 -0700",
 	}
-	cfg := &Config{
-		Containers: []Container{c1},
+	c2 := Container{
+		Name: "container2",
+		Regex: `^([\d.]+) - \[([^\]]*)\] - "([^"]*)" (\d+)`,
+		TimeGroup: 2,
+		TimeFormat: "2006-01-02T15:04:05-0700",
+		Excludes: []Exclude{{Group: 3, Contains: "ping"}},
 	}
-	if cfg.Containers[0].CompiledRegex != nil {
-		t.Errorf("compile regex is not nil but compile hasn't been called yet")
+	// invalid configuration, should have code to detect this at start up, for now
+	// make sure code handles it
+	c3 := Container{
+		Name: "container3",
+		Regex: `^([\d.]+)`,
+		TimeGroup: 2,
+		TimeFormat: "2006-01-02T15:04:05-0700",
+		Excludes: []Exclude{{Group: 3, Contains: "ping"}},
 	}
-	cfg.compileRegex()
-	if cfg.Containers[0].CompiledRegex == nil {
-		t.Errorf("compile regex is nil")
+	cfg := &Configuration{
+		Containers: []Container{c1, c2, c3},
+		Storage: Storage{LogDirectory: "/tmp/"},
 	}
-}
-
-func TestSetupDir(t *testing.T) {
-	randBytes := make([]byte, 16)
-	rand.Read(randBytes)
-
-	path := filepath.Join(os.TempDir(), hex.EncodeToString(randBytes))
-	cfg := &Config{
-		Storage: Storage{LogDirectory: path},
-	}
-	err := setupDirectory(cfg)
+	dna, err := NewDNAQuery(cfg)
 	if err != nil {
-		t.Errorf("directory setup failed: %v", err)
+		t.Fatalf("unexpected error %v", err)
 	}
-	_, err = os.Stat(path)
-	if os.IsNotExist(err) {
-		t.Errorf("directory does not exist: %v", err)
-	}
-	os.Remove(path)
+	ch := make(chan [2]string)
+	outfile := "output.csv"
+	go dna.processLine(outfile, ch)
+	// regular, expect normal operation
+	ch <- [2]string{"container1", `123.123.123.123 [13/Nov/2017:13:23:01 -0000] - "GET view.json" 200`}
+	ch <- [2]string{"container1", `123.123.123.123 [13/Nov/2017:13:23:04 -0000] - "GET ping.json" 200`}
+	ch <- [2]string{"container2", `2.1.5.3 - [2017-12-03T13:23:04-0500] - "GET ping.json" 200`}
+	ch <- [2]string{"container2", `2.1.5.3 - [2017-12-03T13:23:04-0500] - "GET view.json" 200`}
+	// case where exclusion and time groups are more then regex
+	ch <- [2]string{"container3", `2.1.5.3`}
+	// case where there is no container registered
+	ch <- [2]string{"container", `2.1.5.3 - [2017-12-03T13:23:04-0500] - "GET view.json" 200`}
+	// case where the log line doesn't match regex
+	ch <- [2]string{"container1", `error`}
+	close(ch)
 
-	path = ""
-	cfg = &Config{
-		Storage: Storage{LogDirectory: path},
+	// sleep a bit for goroutine to finish up once channel is closed
+	time.Sleep(500 * time.Millisecond)
+	dat, err := ioutil.ReadFile(outfile)
+	if err != nil {
+		t.Fatalf("unexpected error opening outfile, %v", err)
 	}
-	err = setupDirectory(cfg)
-	if err == nil {
-		t.Error("should have error creating empty dir")
+	lines := strings.Split(string(dat),"\n")
+	expectedLines := 5 // 4 logs + 1 empty line
+	if len(lines) != expectedLines {
+		t.Errorf("expected %d lines, found %d lines", expectedLines, len(lines))
 	}
+	cleanupFiles(outfile)
 }
