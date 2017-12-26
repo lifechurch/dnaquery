@@ -7,11 +7,9 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
@@ -23,94 +21,29 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/buger/jsonparser"
-	toml "github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 	"google.golang.org/api/option"
 )
 
-// AWS holds the configuration for [aws] section of the toml config.
-type AWS struct {
-	Key       string
-	Secret    string
-	Bucket    string
-	LogPrefix string
+
+type DNAQuery struct {
+	cfg *Configuration
 }
 
-// Storage holds the configuration for [storage] section of the toml config.
-type Storage struct {
-	LogDirectory string
-}
-
-// GCP holds the configuration for [gcp] section of the toml config.
-type GCP struct {
-	ProjectID       string
-	CredentialsFile string
-	Bucket          string
-	Dataset         string
-	TemplateTable   string
-}
-
-// Exclude holds the configuration for the [[containers.excludes]] subsection
-// of the toml config.
-type Exclude struct {
-	Group    int
-	Contains string
-}
-
-// Container holds the configuration for a single entry in the [[containers]]
-// section of the toml config.
-type Container struct {
-	Name          string
-	Regex         string
-	CompiledRegex *regexp.Regexp
-	TimeGroup     int
-	TimeFormat    string
-	Excludes      []Exclude
-}
-
-// Config holds the full configuration loaded from the toml config file.
-type Config struct {
-	AWS        AWS
-	Storage    Storage
-	GCP        GCP
-	Containers []Container
-}
-
-func (cfg *Config) getContainer(c string) (Container, error) {
-	for _, container := range cfg.Containers {
-		if c == container.Name {
-			return container, nil
-		}
+func NewDNAQuery(cfg *Configuration) (*DNAQuery, error) {
+	if len(cfg.Containers) < 1 {
+		return nil, errors.New("Configuration needs at least 1 container")
 	}
-	return Container{}, errors.New("Container not found")
-}
-
-func (cfg *Config) compileRegex() {
-	for i, c := range cfg.Containers {
-		cmp := regexp.MustCompile(c.Regex)
-		cfg.Containers[i].CompiledRegex = cmp
+	dna := &DNAQuery{
+		cfg: cfg,
 	}
-}
-
-func readConfig(path string, cfg *Config) error {
-	data, err := ioutil.ReadFile(path)
+	dna.cfg.compileRegex()
+	err := dna.cfg.setupDirectory()
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Unable to open config (%s)", path))
+		return nil, errors.Wrap(err, "Error setting up directory")
 	}
-	err = toml.Unmarshal(data, cfg)
-	if err != nil {
-		return errors.Wrap(err, "Error loading config")
-	}
-	return nil
-}
-
-func setupDirectory(cfg *Config) error {
-	err := os.MkdirAll(cfg.Storage.LogDirectory, os.ModePerm)
-	if err != nil {
-		err = errors.Wrap(err, fmt.Sprintf("Unable to create dir %s", cfg.Storage.LogDirectory))
-	}
-	return err
+	return dna, nil
 }
 
 func cleanupFiles(path ...string) {
@@ -122,9 +55,9 @@ func cleanupFiles(path ...string) {
 	}
 }
 
-func readLine(path string, cfg *Config) chan [2]string {
+func (d *DNAQuery) readLine(path string) chan [2]string {
 	ch := make(chan [2]string, 50)
-	go func(path string, ch chan [2]string, cfg *Config) {
+	go func(path string, ch chan [2]string) {
 		defer close(ch)
 		log.Println("Opening Logfile", path)
 		inFile, err := os.Open(path)
@@ -146,7 +79,7 @@ func readLine(path string, cfg *Config) chan [2]string {
 			lineCount++
 			data := scanner.Bytes()
 			container, _ := jsonparser.GetString(data, "container")
-			_, err := cfg.getContainer(container)
+			_, err := d.cfg.getContainer(container)
 			if err != nil {
 				continue
 			}
@@ -157,11 +90,11 @@ func readLine(path string, cfg *Config) chan [2]string {
 			log.Fatalln("Error reading log file:", err.Error())
 		}
 		log.Printf("Scanning complete. %d lines scanned\n", lineCount)
-	}(path, ch, cfg)
+	}(path, ch)
 	return ch
 }
 
-func processLine(path string, ch chan [2]string, cfg *Config) {
+func (d *DNAQuery) processLine(path string, ch chan [2]string) {
 	log.Println("Starting processLine")
 	csvOut, err := os.Create(path)
 	if err != nil {
@@ -176,7 +109,7 @@ func processLine(path string, ch chan [2]string, cfg *Config) {
 		line := r[1]
 		var record []string
 		record = append(record, container)
-		c, err := cfg.getContainer(container)
+		c, err := d.cfg.getContainer(container)
 		if err != nil {
 			log.Println("Can't find container config in processLine:", container)
 			continue
@@ -192,6 +125,7 @@ func processLine(path string, ch chan [2]string, cfg *Config) {
 		for _, e := range c.Excludes {
 			if e.Group >= len(result) {
 				log.Printf("skipping exclusion: %v, Group not found in result", e)
+				continue
 			}
 			if strings.Contains(result[e.Group], e.Contains) {
 				exclude = true
@@ -203,13 +137,17 @@ func processLine(path string, ch chan [2]string, cfg *Config) {
 			continue
 		}
 		// change time format
-		dt, err := time.Parse(c.TimeFormat, result[c.TimeGroup])
-		if err != nil {
-			// log.Println("skipping row:", err.Error())
-			nSkipped++
-			continue
+		if c.TimeGroup >= len(result) {
+			log.Println("skipping time formating. Group not found in result")
+		} else {
+			dt, err := time.Parse(c.TimeFormat, result[c.TimeGroup])
+			if err != nil {
+				// log.Println("skipping row:", err.Error())
+				nSkipped++
+				continue
+			}
+			result[c.TimeGroup] = dt.Format("2006-01-02 15:04:05 -07:00")
 		}
-		result[c.TimeGroup] = dt.Format("2006-01-02 15:04:05 -07:00")
 		nMatches++
 		record = append(record, result[1:]...)
 		if err = w.Write(record); err != nil {
@@ -226,15 +164,15 @@ func processLine(path string, ch chan [2]string, cfg *Config) {
 	log.Println("Completed processLine")
 }
 
-func getLogfile(cfg *Config, logDate string) (logName string) {
-	d, _ := time.Parse("2006-01-02", logDate)
-	logName = cfg.AWS.LogPrefix + "." + logDate + ".json.gz"
-	localLogName := filepath.Join(cfg.Storage.LogDirectory, logName)
-	item := d.Format("2006/01/") + logName
+func (d *DNAQuery) getLogfile(logDate string) (logName string) {
+	date, _ := time.Parse("2006-01-02", logDate)
+	logName = d.cfg.AWS.LogPrefix + "." + logDate + ".json.gz"
+	localLogName := filepath.Join(d.cfg.Storage.LogDirectory, logName)
+	item := date.Format("2006/01/") + logName
 
 	awsCfg := &aws.Config{
 		Region:      aws.String("us-east-1"),
-		Credentials: credentials.NewStaticCredentials(cfg.AWS.Key, cfg.AWS.Secret, ""),
+		Credentials: credentials.NewStaticCredentials(d.cfg.AWS.Key, d.cfg.AWS.Secret, ""),
 	}
 	sess, err := session.NewSession(awsCfg)
 	if err != nil {
@@ -243,7 +181,7 @@ func getLogfile(cfg *Config, logDate string) (logName string) {
 
 	svc := s3.New(sess)
 	obi := &s3.GetObjectInput{
-		Bucket: aws.String(cfg.AWS.Bucket),
+		Bucket: aws.String(d.cfg.AWS.Bucket),
 		Key:    aws.String(item),
 	}
 	ob, err := svc.GetObject(obi)
@@ -282,11 +220,11 @@ func getLogfile(cfg *Config, logDate string) (logName string) {
 	return localLogName
 }
 
-func uploadToGCS(path string, object string, cfg *Config) error {
+func (d *DNAQuery) uploadToGCS(path string, object string) error {
 	log.Println("Starting upload to GCS")
-	os.Setenv("GOOGLE_CLOUD_PROJECT", cfg.GCP.ProjectID)
+	os.Setenv("GOOGLE_CLOUD_PROJECT", d.cfg.GCP.ProjectID)
 	ctx := context.Background()
-	client, err := storage.NewClient(ctx, option.WithCredentialsFile(cfg.GCP.CredentialsFile))
+	client, err := storage.NewClient(ctx, option.WithCredentialsFile(d.cfg.GCP.CredentialsFile))
 	if err != nil {
 		log.Fatalln("Error creating storage client", err.Error())
 	}
@@ -298,7 +236,7 @@ func uploadToGCS(path string, object string, cfg *Config) error {
 
 	stat, _ := f.Stat()
 	log.Printf("Upload size: %f MB\n", float64(stat.Size())/1024/1024)
-	wc := client.Bucket(cfg.GCP.Bucket).Object(object).NewWriter(ctx)
+	wc := client.Bucket(d.cfg.GCP.Bucket).Object(object).NewWriter(ctx)
 	nBytes, nChunks := int64(0), int64(0)
 	r := bufio.NewReader(f)
 	buf := make([]byte, 0, 4*1024)
@@ -335,21 +273,21 @@ func uploadToGCS(path string, object string, cfg *Config) error {
 	return nil
 }
 
-func loadInBQ(object string, date string, cfg *Config) {
+func (d *DNAQuery) loadInBQ(object string, date string) {
 	date = strings.Replace(date, "-", "_", -1)
 	log.Println("Starting load into BQ")
 	ctx := context.Background()
-	client, err := bigquery.NewClient(ctx, cfg.GCP.ProjectID,
-		option.WithCredentialsFile(cfg.GCP.CredentialsFile))
+	client, err := bigquery.NewClient(ctx, d.cfg.GCP.ProjectID,
+		option.WithCredentialsFile(d.cfg.GCP.CredentialsFile))
 	if err != nil {
 		log.Fatalln("Error creating BQ Client", err.Error())
 
 	}
-	myDataset := client.Dataset(cfg.GCP.Dataset)
+	myDataset := client.Dataset(d.cfg.GCP.Dataset)
 
-	templateTable := myDataset.Table(cfg.GCP.TemplateTable)
+	templateTable := myDataset.Table(d.cfg.GCP.TemplateTable)
 
-	gscURL := "gs://" + cfg.GCP.Bucket + "/" + object
+	gscURL := "gs://" + d.cfg.GCP.Bucket + "/" + object
 	gcsRef := bigquery.NewGCSReference(gscURL)
 	tmpTableMeta, err := templateTable.Metadata(ctx)
 	if err != nil {
@@ -393,34 +331,32 @@ func run(c *cli.Context) error {
 	configFile := c.String("config")
 
 	// load config
-	cfg := &Config{}
-	err := readConfig(configFile, cfg)
-	if err != nil {
-		log.Fatalln(err.Error())
-	}
-	cfg.compileRegex()
-
-	err = setupDirectory(cfg)
+	cfg, err := NewConfiguration(configFile)
 	if err != nil {
 		log.Fatalln(err.Error())
 	}
 
-	logName := getLogfile(cfg, dateToProcess)
+	dna, err := NewDNAQuery(cfg)
+	if err != nil {
+		log.Fatalln(err.Error())
+	}
+	logName := dna.getLogfile(dateToProcess)
+	defer cleanupFiles(logName)
 
-	ch := readLine(logName, cfg)
+	ch := dna.readLine(logName)
 
 	outFile := "results_" + dateToProcess + ".csv"
 	outPath := filepath.Join(cfg.Storage.LogDirectory, outFile)
-	processLine(outPath, ch, cfg)
+	defer cleanupFiles(outPath)
+	dna.processLine(outPath, ch)
 
 	gcsObject := dateToProcess + "_results.csv"
-	err = uploadToGCS(outPath, gcsObject, cfg)
+	err = dna.uploadToGCS(outPath, gcsObject)
 	if err != nil {
 		log.Fatalln("Error uploading to GCS:", err.Error())
 	}
-	loadInBQ(gcsObject, dateToProcess, cfg)
+	dna.loadInBQ(gcsObject, dateToProcess)
 
-	cleanupFiles(logName, outPath)
 	return nil
 }
 
