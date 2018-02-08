@@ -97,3 +97,16 @@ func TestSetupDir(t *testing.T) {
 	}
 }
 
+func TestExtractContainerNames(t *testing.T) {
+	cfg := &Configuration{
+		Containers: []Container{{Name: "c1"}, {Name: "c2"}},
+	}
+	names := cfg.extractContainerNames()
+	expected := make(map[string]struct{}, len(cfg.Containers))
+	expected["c1"] = struct{}{}
+	expected["c2"] = struct{}{}
+	if !cmp.Equal(names, expected) {
+		t.Errorf("expected names to equal %v, received %v instead", expected, names)
+	}
+}
+
