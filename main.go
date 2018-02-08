@@ -26,7 +26,6 @@ import (
 	"google.golang.org/api/option"
 )
 
-
 type DNAQuery struct {
 	cfg *Configuration
 }
@@ -175,9 +174,7 @@ func (d *DNAQuery) getLogfile(logDate string) (logName string) {
 		Credentials: credentials.NewStaticCredentials(d.cfg.AWS.Key, d.cfg.AWS.Secret, ""),
 	}
 	sess, err := session.NewSession(awsCfg)
-	if err != nil {
-		log.Fatalf("Unable to create session: %v", err)
-	}
+	CheckErr("Unable to create session: ", err)
 
 	svc := s3.New(sess)
 	obi := &s3.GetObjectInput{
@@ -185,9 +182,7 @@ func (d *DNAQuery) getLogfile(logDate string) (logName string) {
 		Key:    aws.String(item),
 	}
 	ob, err := svc.GetObject(obi)
-	if err != nil {
-		log.Fatal("Error getting object:", err.Error())
-	}
+	CheckErr("Error getting object: ", err)
 	sizeInS3 := *ob.ContentLength
 	log.Printf("File in S3 is %f GB", float64(*ob.ContentLength)/1024/1024/1024)
 
@@ -225,9 +220,7 @@ func (d *DNAQuery) uploadToGCS(path string, object string) error {
 	os.Setenv("GOOGLE_CLOUD_PROJECT", d.cfg.GCP.ProjectID)
 	ctx := context.Background()
 	client, err := storage.NewClient(ctx, option.WithCredentialsFile(d.cfg.GCP.CredentialsFile))
-	if err != nil {
-		log.Fatalln("Error creating storage client", err.Error())
-	}
+	CheckErr("Error creating storage client: ", err)
 	f, err := os.Open(path)
 	if err != nil {
 		return err
@@ -279,10 +272,8 @@ func (d *DNAQuery) loadInBQ(object string, date string) {
 	ctx := context.Background()
 	client, err := bigquery.NewClient(ctx, d.cfg.GCP.ProjectID,
 		option.WithCredentialsFile(d.cfg.GCP.CredentialsFile))
-	if err != nil {
-		log.Fatalln("Error creating BQ Client", err.Error())
+	CheckErr("Error creating BQ Client: ", err)
 
-	}
 	myDataset := client.Dataset(d.cfg.GCP.Dataset)
 
 	templateTable := myDataset.Table(d.cfg.GCP.TemplateTable)
@@ -290,9 +281,7 @@ func (d *DNAQuery) loadInBQ(object string, date string) {
 	gscURL := "gs://" + d.cfg.GCP.Bucket + "/" + object
 	gcsRef := bigquery.NewGCSReference(gscURL)
 	tmpTableMeta, err := templateTable.Metadata(ctx)
-	if err != nil {
-		log.Fatalln("Error getting template table", err.Error())
-	}
+	CheckErr("Error getting template table: ", err)
 	gcsRef.Schema = tmpTableMeta.Schema
 	tableName := date
 	loader := myDataset.Table(tableName).LoaderFrom(gcsRef)
@@ -300,16 +289,12 @@ func (d *DNAQuery) loadInBQ(object string, date string) {
 	loader.WriteDisposition = bigquery.WriteTruncate
 
 	job, err := loader.Run(ctx)
-	if err != nil {
-		log.Fatalln("Error running job:", err.Error())
-	}
+	CheckErr("Error running job: ", err)
 	log.Println("BQ Job created...")
 	pollInterval := 5 * time.Second
 	for {
 		status, err := job.Status(ctx)
-		if err != nil {
-			log.Fatalln("Job Error:", err.Error())
-		}
+		CheckErr("Job Error: ", err)
 		if status.Done() {
 			if status.Err() != nil {
 				log.Fatalf("Job failed with error %v", status.Err())
@@ -332,14 +317,11 @@ func run(c *cli.Context) error {
 
 	// load config
 	cfg, err := NewConfiguration(configFile)
-	if err != nil {
-		log.Fatalln(err.Error())
-	}
+	CheckErr("Error: ", err)
 
 	dna, err := NewDNAQuery(cfg)
-	if err != nil {
-		log.Fatalln(err.Error())
-	}
+	CheckErr("Error: ", err)
+
 	logName := dna.getLogfile(dateToProcess)
 	defer cleanupFiles(logName)
 
@@ -352,9 +334,8 @@ func run(c *cli.Context) error {
 
 	gcsObject := dateToProcess + "_results.csv"
 	err = dna.uploadToGCS(outPath, gcsObject)
-	if err != nil {
-		log.Fatalln("Error uploading to GCS:", err.Error())
-	}
+	CheckErr("Error uploading to GCS:", err)
+
 	dna.loadInBQ(gcsObject, dateToProcess)
 
 	return nil
