@@ -3,7 +3,9 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/lifechurch/dnaquery)](https://goreportcard.com/report/github.com/lifechurch/dnaquery) [![Build Status](https://travis-ci.org/lifechurch/dnaquery.svg?branch=master)](https://travis-ci.org/lifechurch/dnaquery)
 [![Coverage Status](https://coveralls.io/repos/github/lifechurch/dnaquery/badge.svg?branch=master)](https://coveralls.io/github/lifechurch/dnaquery?branch=master)
 
-DNAQuery is a command line utility to take [LogDNA](https://logdna.com) archives and load them into [BigQuery](https://cloud.google.com/bigquery/). This allows long-term, queryable storage of logs in BigQuery (which is considerably more cost effective). In our use case we want real-time access to lots of different logs, and long-term storage of a subset of those logs. This approach has helped us find a balance between access and cost.
+DNAQuery is a command line utility to take [LogDNA](https://logdna.com) archives and load them into [BigQuery](https://cloud.google.com/bigquery/). This allows long-term, queryable storage of logs in BigQuery (which is considerably more cost effective). In our use case, we want real-time access to many different logs and long-term storage of a subset of those logs. This approach has helped us find a balance between access and cost.
+
+Note: v0.2.0 will remove the AWS dependency in favor of using LogDNA's new [Google Cloud Storage archiving](https://docs.logdna.com/docs/archiving#section-google-cloud-storage).
 
 ## Getting Started
 
@@ -79,7 +81,7 @@ This project uses [dep](https://github.com/golang/dep) for dependency management
 
 ```
 go get -u github.com/golang/dep/cmd/dep
-dep ensure -update; dep prune
+dep ensure -update
 ```
 
 ## testing
