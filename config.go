@@ -66,6 +66,14 @@ func (cfg *Configuration) getContainer(c string) (Container, error) {
 	return Container{}, errors.New("Container not found")
 }
 
+func (cfg *Configuration) extractContainerNames() (set map[string]struct{}) {
+	set = make(map[string]struct{}, len(cfg.Containers))
+	for _, container := range cfg.Containers {
+		set[container.Name] = struct{}{}
+ 	}
+ 	return set
+}
+
 func (cfg *Configuration) compileRegex() {
 	for i, c := range cfg.Containers {
 		cmp := regexp.MustCompile(c.Regex)
