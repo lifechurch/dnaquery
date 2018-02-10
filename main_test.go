@@ -1,10 +1,11 @@
 package main
 
 import (
-	"os"
-	"testing"
 	"io/ioutil"
+	"os"
+	"reflect"
 	"strings"
+	"testing"
 	"time"
 )
 
@@ -55,32 +56,100 @@ func TestCleanupFiles(t *testing.T) {
 	}
 }
 
-func TestProcessLine(t *testing.T) {
+func TestDNAQuery_readLine(t *testing.T) {
+	ch := make(chan [2]string, 50)
+	m := make(map[string]struct{})
 	c1 := Container{
-		Name: "container1",
-		Regex: `^([\d.]+) \[([^\]]*)\] - "([^"]*)" (\d+)`,
-		TimeGroup: 2,
+		Name:       "container1",
+		Regex:      `^([\d.]+) \[([^\]]*)\] - "([^"]*)" (\d+)`,
+		TimeGroup:  2,
 		TimeFormat: "2/Jan/2006:15:04:05 -0700",
 	}
 	c2 := Container{
-		Name: "container2",
-		Regex: `^([\d.]+) - \[([^\]]*)\] - "([^"]*)" (\d+)`,
-		TimeGroup: 2,
+		Name:       "container2",
+		Regex:      `^([\d.]+) - \[([^\]]*)\] - "([^"]*)" (\d+)`,
+		TimeGroup:  2,
 		TimeFormat: "2006-01-02T15:04:05-0700",
-		Excludes: []Exclude{{Group: 3, Contains: "ping"}},
+		Excludes:   []Exclude{{Group: 3, Contains: "ping"}},
 	}
 	// invalid configuration, should have code to detect this at start up, for now
 	// make sure code handles it
 	c3 := Container{
-		Name: "container3",
-		Regex: `^([\d.]+)`,
-		TimeGroup: 2,
+		Name:       "container3",
+		Regex:      `^([\d.]+)`,
+		TimeGroup:  2,
 		TimeFormat: "2006-01-02T15:04:05-0700",
-		Excludes: []Exclude{{Group: 3, Contains: "ping"}},
+		Excludes:   []Exclude{{Group: 3, Contains: "ping"}},
 	}
 	cfg := &Configuration{
 		Containers: []Container{c1, c2, c3},
-		Storage: Storage{LogDirectory: "/tmp/"},
+		Storage:    Storage{LogDirectory: "/tmp/"},
+	}
+	type fields struct {
+		Configuration  *Configuration
+		containerNames map[string]struct{}
+	}
+	type args struct {
+		path string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   chan [2]string
+	}{
+		// Test cases
+		{
+			name: "Test Log File",
+			fields: fields{
+				Configuration:  cfg,
+				containerNames: m,
+			},
+			args: args{
+				path: "", // Need a path to a test Logfile here to readLines from
+			},
+			want: ch,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := &DNAQuery{
+				Configuration:  tt.fields.Configuration,
+				containerNames: tt.fields.containerNames,
+			}
+			if got := d.readLine(tt.args.path); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DNAQuery.readLine() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestProcessLine(t *testing.T) {
+	c1 := Container{
+		Name:       "container1",
+		Regex:      `^([\d.]+) \[([^\]]*)\] - "([^"]*)" (\d+)`,
+		TimeGroup:  2,
+		TimeFormat: "2/Jan/2006:15:04:05 -0700",
+	}
+	c2 := Container{
+		Name:       "container2",
+		Regex:      `^([\d.]+) - \[([^\]]*)\] - "([^"]*)" (\d+)`,
+		TimeGroup:  2,
+		TimeFormat: "2006-01-02T15:04:05-0700",
+		Excludes:   []Exclude{{Group: 3, Contains: "ping"}},
+	}
+	// invalid configuration, should have code to detect this at start up, for now
+	// make sure code handles it
+	c3 := Container{
+		Name:       "container3",
+		Regex:      `^([\d.]+)`,
+		TimeGroup:  2,
+		TimeFormat: "2006-01-02T15:04:05-0700",
+		Excludes:   []Exclude{{Group: 3, Contains: "ping"}},
+	}
+	cfg := &Configuration{
+		Containers: []Container{c1, c2, c3},
+		Storage:    Storage{LogDirectory: "/tmp/"},
 	}
 	dna, err := NewDNAQuery(cfg)
 	if err != nil {
@@ -108,7 +177,7 @@ func TestProcessLine(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error opening outfile, %v", err)
 	}
-	lines := strings.Split(string(dat),"\n")
+	lines := strings.Split(string(dat), "\n")
 	expectedLines := 5 // 4 logs + 1 empty line
 	if len(lines) != expectedLines {
 		t.Errorf("expected %d lines, found %d lines", expectedLines, len(lines))
