@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/urfave/cli"
 )
 
 func TestNewDNAQuery(t *testing.T) {
@@ -92,6 +94,10 @@ func TestDNAQuery_readLine(t *testing.T) {
 	type args struct {
 		path string
 	}
+	c := &cli.Context{}
+	d := &DNAQuery{}
+	dateToProcess := c.String("date")
+	logName := d.getLogfile(dateToProcess)
 	tests := []struct {
 		name   string
 		fields fields
@@ -106,11 +112,12 @@ func TestDNAQuery_readLine(t *testing.T) {
 				containerNames: m,
 			},
 			args: args{
-				path: "", // Need a path to a test Logfile here to readLines from
+				path: logName, // Need a path to a test Logfile here to readLines from
 			},
 			want: ch,
 		},
 	}
+	close(ch)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			d := &DNAQuery{
