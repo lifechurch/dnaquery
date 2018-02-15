@@ -8,3 +8,6 @@ before_install:
 script:
     # goveralls also runs the test
   - $GOPATH/bin/goveralls -service=travis-ci -v -race
+
+after_success:
+  - test -n "$TRAVIS_TAG" && curl -sL https://git.io/goreleaser | bash
