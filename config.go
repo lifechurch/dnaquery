@@ -1,21 +1,13 @@
 package main
 
 import (
-	"regexp"
-	"io/ioutil"
 	"fmt"
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
+	"io/ioutil"
 	"os"
+	"regexp"
 )
-
-// AWS holds the configuration for [aws] section of the toml config.
-type AWS struct {
-	Key       string
-	Secret    string
-	Bucket    string
-	LogPrefix string
-}
 
 // Storage holds the configuration for [storage] section of the toml config.
 type Storage struct {
@@ -26,9 +18,11 @@ type Storage struct {
 type GCP struct {
 	ProjectID       string
 	CredentialsFile string
-	Bucket          string
+	UploadBucket    string
 	Dataset         string
 	TemplateTable   string
+	LogPrefix       string
+	LogBucket       string
 }
 
 // Exclude holds the configuration for the [[containers.excludes]] subsection
@@ -51,7 +45,6 @@ type Container struct {
 
 // Configuration holds the full configuration loaded from the toml config file.
 type Configuration struct {
-	AWS        AWS
 	Storage    Storage
 	GCP        GCP
 	Containers []Container
@@ -70,8 +63,8 @@ func (cfg *Configuration) extractContainerNames() (set map[string]struct{}) {
 	set = make(map[string]struct{}, len(cfg.Containers))
 	for _, container := range cfg.Containers {
 		set[container.Name] = struct{}{}
- 	}
- 	return set
+	}
+	return set
 }
 
 func (cfg *Configuration) compileRegex() {
