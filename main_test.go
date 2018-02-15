@@ -1,10 +1,10 @@
 package main
 
 import (
-	"os"
-	"testing"
 	"io/ioutil"
+	"os"
 	"strings"
+	"testing"
 	"time"
 )
 
@@ -22,10 +22,10 @@ func TestNewDNAQuery(t *testing.T) {
 		t.Errorf("should error if no log directory is specified")
 	}
 
-	cfg, err = NewConfiguration("example.toml")
-	dna, err := NewDNAQuery(cfg)
+	cfg, _ = NewConfiguration("example.toml")
+	dna, _ := NewDNAQuery(cfg)
 	if dna == nil {
-		t.Error("dna sould not be nil")
+		t.Error("dna should not be nil")
 	}
 
 }
@@ -57,30 +57,30 @@ func TestCleanupFiles(t *testing.T) {
 
 func TestProcessLine(t *testing.T) {
 	c1 := Container{
-		Name: "container1",
-		Regex: `^([\d.]+) \[([^\]]*)\] - "([^"]*)" (\d+)`,
-		TimeGroup: 2,
+		Name:       "container1",
+		Regex:      `^([\d.]+) \[([^\]]*)\] - "([^"]*)" (\d+)`,
+		TimeGroup:  2,
 		TimeFormat: "2/Jan/2006:15:04:05 -0700",
 	}
 	c2 := Container{
-		Name: "container2",
-		Regex: `^([\d.]+) - \[([^\]]*)\] - "([^"]*)" (\d+)`,
-		TimeGroup: 2,
+		Name:       "container2",
+		Regex:      `^([\d.]+) - \[([^\]]*)\] - "([^"]*)" (\d+)`,
+		TimeGroup:  2,
 		TimeFormat: "2006-01-02T15:04:05-0700",
-		Excludes: []Exclude{{Group: 3, Contains: "ping"}},
+		Excludes:   []Exclude{{Group: 3, Contains: "ping"}},
 	}
 	// invalid configuration, should have code to detect this at start up, for now
 	// make sure code handles it
 	c3 := Container{
-		Name: "container3",
-		Regex: `^([\d.]+)`,
-		TimeGroup: 2,
+		Name:       "container3",
+		Regex:      `^([\d.]+)`,
+		TimeGroup:  2,
 		TimeFormat: "2006-01-02T15:04:05-0700",
-		Excludes: []Exclude{{Group: 3, Contains: "ping"}},
+		Excludes:   []Exclude{{Group: 3, Contains: "ping"}},
 	}
 	cfg := &Configuration{
 		Containers: []Container{c1, c2, c3},
-		Storage: Storage{LogDirectory: "/tmp/"},
+		Storage:    Storage{LogDirectory: "/tmp/"},
 	}
 	dna, err := NewDNAQuery(cfg)
 	if err != nil {
@@ -108,7 +108,7 @@ func TestProcessLine(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error opening outfile, %v", err)
 	}
-	lines := strings.Split(string(dat),"\n")
+	lines := strings.Split(string(dat), "\n")
 	expectedLines := 5 // 4 logs + 1 empty line
 	if len(lines) != expectedLines {
 		t.Errorf("expected %d lines, found %d lines", expectedLines, len(lines))

@@ -1,9 +1,3 @@
-[aws]
-Key = "key123123123132"
-Secret = "secret123123123123"
-Bucket = "logs"
-LogPrefix = "a7112abc9d"
-
 [storage]
 LogDirectory = 'logs'
 
@@ -19,6 +13,8 @@ LogDirectory = 'logs'
 [gcp]
 ProjectID = "gcpproj"
 CredentialsFile = "gcp_credentials.json"
-Bucket = "logdna_to_bq"
+UploadBucket = "logdna_to_bq"
 Dataset = "logdna"
 TemplateTable = "logdna"
+LogPrefix = "a7112abc9d"
+LogBucket = "logs"

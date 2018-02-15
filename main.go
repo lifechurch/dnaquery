@@ -15,11 +15,6 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/storage"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/buger/jsonparser"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
@@ -37,7 +32,7 @@ func NewDNAQuery(cfg *Configuration) (*DNAQuery, error) {
 	}
 
 	dna := &DNAQuery{
-		Configuration: cfg,
+		Configuration:  cfg,
 		containerNames: cfg.extractContainerNames(),
 	}
 	dna.compileRegex()
@@ -163,49 +158,44 @@ func (d *DNAQuery) processLine(path string, ch chan [2]string) {
 }
 
 func (d *DNAQuery) getLogfile(logDate string) (logName string) {
-	date, _ := time.Parse("2006-01-02", logDate)
-	logName = d.AWS.LogPrefix + "." + logDate + ".json.gz"
+	logName = d.GCP.LogPrefix + "." + logDate + ".json.gz"
 	localLogName := filepath.Join(d.Storage.LogDirectory, logName)
-	item := date.Format("2006/01/") + logName
 
-	awsCfg := &aws.Config{
-		Region:      aws.String("us-east-1"),
-		Credentials: credentials.NewStaticCredentials(d.AWS.Key, d.AWS.Secret, ""),
-	}
-	sess, err := session.NewSession(awsCfg)
-	CheckErr("Unable to create session: ", err)
+	os.Setenv("GOOGLE_CLOUD_PROJECT", d.GCP.ProjectID)
+	ctx := context.Background()
+	client, err := storage.NewClient(ctx, option.WithCredentialsFile(d.GCP.CredentialsFile))
+	CheckErr("Error creating storage client: ", err)
+	bkt := client.Bucket(d.GCP.LogBucket)
 
-	svc := s3.New(sess)
-	obi := &s3.GetObjectInput{
-		Bucket: aws.String(d.AWS.Bucket),
-		Key:    aws.String(item),
-	}
-	ob, err := svc.GetObject(obi)
-	CheckErr("Error getting object: ", err)
-	sizeInS3 := *ob.ContentLength
-	log.Printf("File in S3 is %f GB", float64(*ob.ContentLength)/1024/1024/1024)
+	obj := bkt.Object(logName)
+	objAttrs, err := obj.Attrs(ctx)
+	CheckErr("Error getting object attrs: ", err)
+	sizeInGCS := objAttrs.Size
+	log.Printf("File in GCS is %f GB", float64(sizeInGCS)/1024/1024/1024)
 
 	downloadFile := true
 	if file, err := os.Open(localLogName); err == nil {
 		stat, _ := file.Stat()
 		// if file on disk is same size don't download
-		downloadFile = stat.Size() != sizeInS3
+		downloadFile = stat.Size() != sizeInGCS
 		file.Close()
 	}
 
 	if downloadFile {
-		log.Printf("Downloading from S3")
-		downloader := s3manager.NewDownloader(sess)
+		log.Printf("Downloading from GCS")
 
 		file, err := os.Create(localLogName)
 		if err != nil {
-			log.Fatalf("Unable to open file %q, %v", item, err)
+			log.Fatalf("Unable to open file %q, %v", logName, err)
 		}
 		defer file.Close()
 
-		numBytes, err := downloader.Download(file, obi)
+		r, err := obj.NewReader(ctx)
+		CheckErr("Error getting object reader: ", err)
+		defer r.Close()
+		numBytes, err := io.Copy(file, r)
 		if err != nil {
-			log.Fatalf("Unable to download item %q, %v", item, err)
+			log.Fatalf("Unable to download item %q, %v", logName, err)
 		}
 		fmt.Println("Downloaded", file.Name(), numBytes, "bytes")
 	} else {
@@ -228,7 +218,7 @@ func (d *DNAQuery) uploadToGCS(path string, object string) error {
 
 	stat, _ := f.Stat()
 	log.Printf("Upload size: %f MB\n", float64(stat.Size())/1024/1024)
-	wc := client.Bucket(d.GCP.Bucket).Object(object).NewWriter(ctx)
+	wc := client.Bucket(d.GCP.UploadBucket).Object(object).NewWriter(ctx)
 	nBytes, nChunks := int64(0), int64(0)
 	r := bufio.NewReader(f)
 	buf := make([]byte, 0, 4*1024)
@@ -277,7 +267,7 @@ func (d *DNAQuery) loadInBQ(object string, date string) {
 
 	templateTable := myDataset.Table(d.GCP.TemplateTable)
 
-	gscURL := "gs://" + d.GCP.Bucket + "/" + object
+	gscURL := "gs://" + d.GCP.UploadBucket + "/" + object
 	gcsRef := bigquery.NewGCSReference(gscURL)
 	tmpTableMeta, err := templateTable.Metadata(ctx)
 	CheckErr("Error getting template table: ", err)
@@ -355,6 +345,6 @@ func main() {
 		},
 	}
 	app.Action = run
-	app.Version = "0.1.0"
+	app.Version = "0.2.0"
 	app.Run(os.Args)
 }

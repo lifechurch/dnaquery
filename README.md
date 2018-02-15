@@ -5,8 +5,6 @@
 
 DNAQuery is a command line utility to take [LogDNA](https://logdna.com) archives and load them into [BigQuery](https://cloud.google.com/bigquery/). This allows long-term, queryable storage of logs in BigQuery (which is considerably more cost effective). In our use case, we want real-time access to many different logs and long-term storage of a subset of those logs. This approach has helped us find a balance between access and cost.
 
-Note: v0.2.0 will remove the AWS dependency in favor of using LogDNA's new [Google Cloud Storage archiving](https://docs.logdna.com/docs/archiving#section-google-cloud-storage).
-
 ## Getting Started
 
 `go get -u github.com/lifechurch/dnaquery`
@@ -15,7 +13,7 @@ DNAQuery has been tested on Go v1.9
 
 ## Prerequisites
 
-- a LogDNA account with [S3 Archiving](https://docs.logdna.com/docs/archiving) enabled
+- a LogDNA account with [GCS Archiving](https://docs.logdna.com/docs/archiving#section-google-cloud-storage) enabled
 - a [Google Cloud Platform](https://cloud.google.com) account
 
 ## Configuring
@@ -25,17 +23,6 @@ DNAQuery has been tested on Go v1.9
 Edit dnaquery.toml
 
 All of these settings are currently required.
-
-### AWS
-Note: It's recommended that you create a new [IAM user](https://console.aws.amazon.com/iam/home) with `s3:GetObject` permission on the LogDNA archive previously setup
-
-```
-[aws]
-Key = "key123123123132" # Key for AWS IAM user
-Secret = "secret123123123123" # Secret for AWS IAM user
-Bucket = "logs" # name of bucket set in LogDNA archive setup above
-LogPrefix = "a7112abc9d" # each archive file starts with a prefix specific to your LogDNA account
-```
 
 ### Storage
 
@@ -65,6 +52,8 @@ CredentialsFile = "gcp_credentials.json" # relative or absolute path to the cred
 Bucket = "logdna_to_bq" # name of bucket in Google Cloud Storage to save results for ingestion into BigQuery, bucket will need to be created before first run
 Dataset = "logdna" # BigQuery dataset
 TemplateTable = "logdna" # currently DNAQuery uses a template table. More details below.
+LogBucket = "logs" # name of bucket set in LogDNA archive setup above
+LogPrefix = "a7112abc9d" # each archive file starts with a prefix specific to your LogDNA account
 ```
 
 #### TemplateTable
