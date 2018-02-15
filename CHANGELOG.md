@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Removed
 - AWS S3 config and download of log archive from AWS. Check latest README for up to date config documentation 
 
-## 0.1.0 - 2017-11-12
+## [0.1.0] - 2017-11-12
 ### Added
 - Working code to take LogDNA archives in AWS S3, process them, and ingest them BigQuery. 
 
