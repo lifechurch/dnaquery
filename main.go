@@ -21,6 +21,8 @@ import (
 	"google.golang.org/api/option"
 )
 
+var version = "0.2.0-dev"
+
 type DNAQuery struct {
 	*Configuration
 	containerNames map[string]struct{}
@@ -345,6 +347,6 @@ func main() {
 		},
 	}
 	app.Action = run
-	app.Version = "0.2.0"
+	app.Version = version
 	app.Run(os.Args)
 }
