@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
-	"github.com/pelletier/go-toml"
-	"github.com/pkg/errors"
 	"io/ioutil"
 	"os"
 	"regexp"
+
+	"github.com/pelletier/go-toml"
+	"github.com/pkg/errors"
 )
 
 // Storage holds the configuration for [storage] section of the toml config.
@@ -25,16 +26,16 @@ type GCP struct {
 	LogBucket       string
 }
 
-// Exclude holds the configuration for the [[containers.excludes]] subsection
+// Exclude holds the configuration for the [[apps.excludes]] subsection
 // of the toml config.
 type Exclude struct {
 	Group    int
 	Contains string
 }
 
-// Container holds the configuration for a single entry in the [[containers]]
+// App holds the configuration for a single entry in the [[apps]]
 // section of the toml config.
-type Container struct {
+type App struct {
 	Name          string
 	Regex         string
 	CompiledRegex *regexp.Regexp
@@ -45,32 +46,32 @@ type Container struct {
 
 // Configuration holds the full configuration loaded from the toml config file.
 type Configuration struct {
-	Storage    Storage
-	GCP        GCP
-	Containers []Container
+	Storage Storage
+	GCP     GCP
+	Apps    []App
 }
 
-func (cfg *Configuration) getContainer(c string) (Container, error) {
-	for _, container := range cfg.Containers {
-		if c == container.Name {
-			return container, nil
+func (cfg *Configuration) getApp(c string) (App, error) {
+	for _, app := range cfg.Apps {
+		if c == app.Name {
+			return app, nil
 		}
 	}
-	return Container{}, errors.New("Container not found")
+	return App{}, errors.New("App not found")
 }
 
-func (cfg *Configuration) extractContainerNames() (set map[string]struct{}) {
-	set = make(map[string]struct{}, len(cfg.Containers))
-	for _, container := range cfg.Containers {
-		set[container.Name] = struct{}{}
+func (cfg *Configuration) extractAppNames() (set map[string]struct{}) {
+	set = make(map[string]struct{}, len(cfg.Apps))
+	for _, app := range cfg.Apps {
+		set[app.Name] = struct{}{}
 	}
 	return set
 }
 
 func (cfg *Configuration) compileRegex() {
-	for i, c := range cfg.Containers {
+	for i, c := range cfg.Apps {
 		cmp := regexp.MustCompile(c.Regex)
-		cfg.Containers[i].CompiledRegex = cmp
+		cfg.Apps[i].CompiledRegex = cmp
 	}
 }
 

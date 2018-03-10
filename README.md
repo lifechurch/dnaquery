@@ -31,15 +31,14 @@ All of these settings are currently required.
 LogDirectory = 'logs' # temp local directory to download logs to and store results, this directory will be created if it doesn't exist
 ```
 
-### Containers
-Note: the term container here is used to be consistent with LogDNA's terminology
+### Apps
 ```
-[[containers]]
-    Name = "production-app"  # name of container
+[[apps]]
+    Name = "production-app"  # name of app
     Regex = '^([\d.]+) - \[([^\]]*)\] - - \[([^\]]*)\] "([^"]*)" (\d+) (\d+) "([^"]*)" "([^"]*)" (\d+) ([\d.]+)  ([\d.:]+) (\d+) ([\d.]+) (\d+)$'  # regex used to pull parts of logs out, currently we don't use any named capture groups
     TimeGroup = 3 # the number of the capture group (1-based) in above regex that holds the time component of the log
     TimeFormat = "2/Jan/2006:15:04:05 -0700" # the format of the time field using https://golang.org/pkg/time/#Parse
-    [[containers.excludes]]  # an array of tables for exclusions
+    [[apps.excludes]]  # an array of tables for exclusions
         Group = 4  # the number of the capture group in above regex to be used in the exclusion check
         Contains = "ping" # excludes logs if the value here is contained in the string in the above capture group
 ```
@@ -58,7 +57,7 @@ LogPrefix = "a7112abc9d" # each archive file starts with a prefix specific to yo
 
 #### TemplateTable
 
-Currently the schema for the BigQuery table is specified by creating a table with the schema that matches the regex. This is likely to change in the future as we may need a different schema for each container above.
+Currently the schema for the BigQuery table is specified by creating a table with the schema that matches the regex. This is likely to change in the future as we may need a different schema for each app above.
 
 ## Usage
 
