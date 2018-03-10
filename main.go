@@ -21,21 +21,21 @@ import (
 	"google.golang.org/api/option"
 )
 
-var version = "0.2.0-dev"
+var version = "0.3.0-dev"
 
 type DNAQuery struct {
 	*Configuration
-	containerNames map[string]struct{}
+	appNames map[string]struct{}
 }
 
 func NewDNAQuery(cfg *Configuration) (*DNAQuery, error) {
-	if len(cfg.Containers) < 1 {
-		return nil, errors.New("Configuration needs at least 1 container")
+	if len(cfg.Apps) < 1 {
+		return nil, errors.New("Configuration needs at least 1 app")
 	}
 
 	dna := &DNAQuery{
-		Configuration:  cfg,
-		containerNames: cfg.extractContainerNames(),
+		Configuration: cfg,
+		appNames:      cfg.extractAppNames(),
 	}
 	dna.compileRegex()
 	err := dna.setupDirectory()
@@ -77,10 +77,10 @@ func (d *DNAQuery) readLine(path string) chan [2]string {
 		for scanner.Scan() {
 			lineCount++
 			data := scanner.Bytes()
-			container, _ := jsonparser.GetString(data, "container")
-			if _, ok := d.containerNames[container]; ok {
+			app, _ := jsonparser.GetString(data, "_app")
+			if _, ok := d.appNames[app]; ok {
 				line, _ := jsonparser.GetString(data, "_line")
-				ch <- [2]string{container, line}
+				ch <- [2]string{app, line}
 			}
 		}
 		if err := scanner.Err(); err != nil {
@@ -102,13 +102,13 @@ func (d *DNAQuery) processLine(path string, ch chan [2]string) {
 	nMatches := 0
 	nSkipped := 0
 	for r := range ch {
-		container := r[0]
+		app := r[0]
 		line := r[1]
 		var record []string
-		record = append(record, container)
-		c, err := d.getContainer(container)
+		record = append(record, app)
+		c, err := d.getApp(app)
 		if err != nil {
-			log.Println("Can't find container config in processLine:", container)
+			log.Println("Can't find app config in processLine:", app)
 			continue
 		}
 		result := c.CompiledRegex.FindStringSubmatch(line)

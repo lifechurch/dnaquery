@@ -34,37 +34,36 @@ func TestReadConfig(t *testing.T) {
 	os.Remove(f)
 }
 
-func TestGetContainers(t *testing.T) {
-	// build a config with 1 Containers
-	c1 := Container{Name: "Container 1"}
+func TestGetApp(t *testing.T) {
+	// build a config with 1 App
+	a1 := App{Name: "App 1"}
 	cfg := &Configuration{
-		Containers: []Container{c1},
+		Apps: []App{a1},
 	}
-	_, err := cfg.getContainer("Container That Doesn't Exist")
+	_, err := cfg.getApp("App That Doesn't Exist")
 	if err == nil {
-		t.Errorf("Err not returned when container doesn't exist")
+		t.Errorf("Err not returned when app doesn't exist")
 	}
 
-	c1Retrieved, _ := cfg.getContainer("Container 1")
-	if !cmp.Equal(c1, c1Retrieved) {
-		t.Errorf("c1 was not equal")
+	a1Retrieved, _ := cfg.getApp("App 1")
+	if !cmp.Equal(a1, a1Retrieved) {
+		t.Errorf("a1 was not equal")
 	}
 }
 
-
 func TestCompileRegex(t *testing.T) {
-	c1 := Container{
-		Name:  "Container 1",
+	a1 := App{
+		Name:  "App 1",
 		Regex: `([\d.]+) - \[([^\]]*)\] - - \[([^\]]*)\]`,
 	}
 	cfg := &Configuration{
-		Containers: []Container{c1},
+		Apps: []App{a1},
 	}
-	if cfg.Containers[0].CompiledRegex != nil {
+	if cfg.Apps[0].CompiledRegex != nil {
 		t.Errorf("compile regex is not nil but compile hasn't been called yet")
 	}
 	cfg.compileRegex()
-	if cfg.Containers[0].CompiledRegex == nil {
+	if cfg.Apps[0].CompiledRegex == nil {
 		t.Errorf("compile regex is nil")
 	}
 }
@@ -97,16 +96,15 @@ func TestSetupDir(t *testing.T) {
 	}
 }
 
-func TestExtractContainerNames(t *testing.T) {
+func TestExtractAppNames(t *testing.T) {
 	cfg := &Configuration{
-		Containers: []Container{{Name: "c1"}, {Name: "c2"}},
+		Apps: []App{{Name: "a1"}, {Name: "a2"}},
 	}
-	names := cfg.extractContainerNames()
-	expected := make(map[string]struct{}, len(cfg.Containers))
-	expected["c1"] = struct{}{}
-	expected["c2"] = struct{}{}
+	names := cfg.extractAppNames()
+	expected := make(map[string]struct{}, len(cfg.Apps))
+	expected["a1"] = struct{}{}
+	expected["a2"] = struct{}{}
 	if !cmp.Equal(names, expected) {
 		t.Errorf("expected names to equal %v, received %v instead", expected, names)
 	}
 }
-

@@ -11,11 +11,11 @@ import (
 func TestNewDNAQuery(t *testing.T) {
 	_, err := NewDNAQuery(&Configuration{})
 	if err == nil {
-		t.Errorf("should error if 0 Containers in config")
+		t.Errorf("should error if 0 Apps in config")
 	}
-	c1 := Container{Name: "Container 1"}
+	c1 := App{Name: "App 1"}
 	cfg := &Configuration{
-		Containers: []Container{c1},
+		Apps: []App{c1},
 	}
 	_, err = NewDNAQuery(cfg)
 	if err == nil {
@@ -56,14 +56,14 @@ func TestCleanupFiles(t *testing.T) {
 }
 
 func TestProcessLine(t *testing.T) {
-	c1 := Container{
-		Name:       "container1",
+	c1 := App{
+		Name:       "app1",
 		Regex:      `^([\d.]+) \[([^\]]*)\] - "([^"]*)" (\d+)`,
 		TimeGroup:  2,
 		TimeFormat: "2/Jan/2006:15:04:05 -0700",
 	}
-	c2 := Container{
-		Name:       "container2",
+	c2 := App{
+		Name:       "app2",
 		Regex:      `^([\d.]+) - \[([^\]]*)\] - "([^"]*)" (\d+)`,
 		TimeGroup:  2,
 		TimeFormat: "2006-01-02T15:04:05-0700",
@@ -71,16 +71,16 @@ func TestProcessLine(t *testing.T) {
 	}
 	// invalid configuration, should have code to detect this at start up, for now
 	// make sure code handles it
-	c3 := Container{
-		Name:       "container3",
+	c3 := App{
+		Name:       "app3",
 		Regex:      `^([\d.]+)`,
 		TimeGroup:  2,
 		TimeFormat: "2006-01-02T15:04:05-0700",
 		Excludes:   []Exclude{{Group: 3, Contains: "ping"}},
 	}
 	cfg := &Configuration{
-		Containers: []Container{c1, c2, c3},
-		Storage:    Storage{LogDirectory: "/tmp/"},
+		Apps:    []App{c1, c2, c3},
+		Storage: Storage{LogDirectory: "/tmp/"},
 	}
 	dna, err := NewDNAQuery(cfg)
 	if err != nil {
@@ -90,16 +90,16 @@ func TestProcessLine(t *testing.T) {
 	outfile := "output.csv"
 	go dna.processLine(outfile, ch)
 	// regular, expect normal operation
-	ch <- [2]string{"container1", `123.123.123.123 [13/Nov/2017:13:23:01 -0000] - "GET view.json" 200`}
-	ch <- [2]string{"container1", `123.123.123.123 [13/Nov/2017:13:23:04 -0000] - "GET ping.json" 200`}
-	ch <- [2]string{"container2", `2.1.5.3 - [2017-12-03T13:23:04-0500] - "GET ping.json" 200`}
-	ch <- [2]string{"container2", `2.1.5.3 - [2017-12-03T13:23:04-0500] - "GET view.json" 200`}
+	ch <- [2]string{"app1", `123.123.123.123 [13/Nov/2017:13:23:01 -0000] - "GET view.json" 200`}
+	ch <- [2]string{"app1", `123.123.123.123 [13/Nov/2017:13:23:04 -0000] - "GET ping.json" 200`}
+	ch <- [2]string{"app2", `2.1.5.3 - [2017-12-03T13:23:04-0500] - "GET ping.json" 200`}
+	ch <- [2]string{"app2", `2.1.5.3 - [2017-12-03T13:23:04-0500] - "GET view.json" 200`}
 	// case where exclusion and time groups are more then regex
-	ch <- [2]string{"container3", `2.1.5.3`}
-	// case where there is no container registered
-	ch <- [2]string{"container", `2.1.5.3 - [2017-12-03T13:23:04-0500] - "GET view.json" 200`}
+	ch <- [2]string{"app3", `2.1.5.3`}
+	// case where there is no app registered
+	ch <- [2]string{"app", `2.1.5.3 - [2017-12-03T13:23:04-0500] - "GET view.json" 200`}
 	// case where the log line doesn't match regex
-	ch <- [2]string{"container1", `error`}
+	ch <- [2]string{"app1", `error`}
 	close(ch)
 
 	// sleep a bit for goroutine to finish up once channel is closed

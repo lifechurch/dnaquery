@@ -1,12 +1,12 @@
 [storage]
 LogDirectory = 'logs'
 
-[[containers]]
+[[apps]]
     Name = "production-app"
     Regex = '^([\d.]+) - \[([^\]]*)\] - - \[([^\]]*)\] "([^"]*)" (\d+) (\d+) "([^"]*)" "([^"]*)" (\d+) ([\d.]+) ([\d.:]+) (\d+) ([\d.]+) (\d+)$'
     TimeGroup = 3
     TimeFormat = "2/Jan/2006:15:04:05 -0700"
-    [[containers.excludes]]
+    [[apps.excludes]]
         Group = 4
         Contains = "ping"
 
