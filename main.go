@@ -23,11 +23,13 @@ import (
 
 var version = "0.3.0"
 
+// DNAQuery holds config and derived data
 type DNAQuery struct {
 	*Configuration
 	appNames map[string]struct{}
 }
 
+// NewDNAQuery returns a DNAQuery instance all setup complete
 func NewDNAQuery(cfg *Configuration) (*DNAQuery, error) {
 	if len(cfg.Apps) < 1 {
 		return nil, errors.New("Configuration needs at least 1 app")
@@ -91,11 +93,11 @@ func (d *DNAQuery) readLine(path string) chan [2]string {
 	return ch
 }
 
-func (d *DNAQuery) processLine(path string, ch chan [2]string) {
+func (d *DNAQuery) processLine(path string, ch chan [2]string) error {
 	log.Println("Starting processLine")
 	csvOut, err := os.Create(path)
 	if err != nil {
-		log.Fatalf("Unable to open output: %s", path)
+		return errors.Wrapf(err, "Unable to open output: %s", path)
 	}
 	w := csv.NewWriter(csvOut)
 	defer csvOut.Close()
@@ -106,47 +108,36 @@ func (d *DNAQuery) processLine(path string, ch chan [2]string) {
 		line := r[1]
 		var record []string
 		record = append(record, app)
-		c, err := d.getApp(app)
+		a, err := d.getApp(app)
 		if err != nil {
 			log.Println("Can't find app config in processLine:", app)
 			continue
 		}
-		result := c.CompiledRegex.FindStringSubmatch(line)
+		result := a.CompiledRegex.FindStringSubmatch(line)
 		if len(result) == 0 {
 			nSkipped++
 			continue
 		}
 		// check exclusion rules
-		exclude := false
-		for _, e := range c.Excludes {
-			if e.Group >= len(result) {
-				log.Printf("skipping exclusion: %v, Group not found in result", e)
-				continue
-			}
-			if strings.Contains(result[e.Group], e.Contains) {
-				exclude = true
-				break
-			}
-		}
-		if exclude {
+		if a.isExcluded(result) {
 			nSkipped++
 			continue
 		}
 		// change time format
-		if c.TimeGroup >= len(result) {
+		if a.TimeGroup >= len(result) {
 			log.Println("skipping time formating. Group not found in result")
 		} else {
-			dt, err := time.Parse(c.TimeFormat, result[c.TimeGroup])
+			dt, err := time.Parse(a.TimeFormat, result[a.TimeGroup])
 			if err != nil {
 				nSkipped++
 				continue
 			}
-			result[c.TimeGroup] = dt.Format("2006-01-02 15:04:05 -07:00")
+			result[a.TimeGroup] = dt.Format("2006-01-02 15:04:05 -07:00")
 		}
 		nMatches++
 		record = append(record, result[1:]...)
 		if err = w.Write(record); err != nil {
-			log.Fatal(err)
+			return errors.Wrapf(err, "Unable to write record: %v", record)
 		}
 	}
 	// Write any buffered data.
@@ -154,9 +145,12 @@ func (d *DNAQuery) processLine(path string, ch chan [2]string) {
 
 	if err := w.Error(); err != nil {
 		log.Fatalln("Error creates csv", err.Error())
+		return errors.Wrap(err, "Unable to create csv")
 	}
 	log.Printf("Matched %d lines, Skipped %d lines\n", nMatches, nSkipped)
 	log.Println("Completed processLine")
+
+	return nil
 }
 
 func (d *DNAQuery) getLogfile(logDate string) (logName string) {
@@ -325,7 +319,10 @@ func run(c *cli.Context) error {
 	if !c.Bool("keep") {
 		defer cleanupFiles(outPath)
 	}
-	dna.processLine(outPath, ch)
+	err = dna.processLine(outPath, ch)
+	if err != nil {
+		return errors.Wrap(err, "Error in processLine")
+	}
 
 	gcsObject := dateToProcess + "_results.csv"
 	err = dna.uploadToGCS(outPath, gcsObject)

@@ -3,8 +3,11 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"regexp"
+
+	"strings"
 
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
@@ -42,6 +45,21 @@ type App struct {
 	TimeGroup     int
 	TimeFormat    string
 	Excludes      []Exclude
+}
+
+func (app *App) isExcluded(r []string) bool {
+	exclude := false
+	for _, e := range app.Excludes {
+		if e.Group >= len(r) {
+			log.Printf("skipping exclusion: %v, Group not found in result", e)
+			continue
+		}
+		if strings.Contains(r[e.Group], e.Contains) {
+			exclude = true
+			break
+		}
+	}
+	return exclude
 }
 
 // Configuration holds the full configuration loaded from the toml config file.

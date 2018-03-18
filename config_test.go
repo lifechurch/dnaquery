@@ -23,7 +23,7 @@ func TestReadConfig(t *testing.T) {
 	}
 	// create bad file
 	f := "bad.toml"
-	f1, err := os.Create(f)
+	f1, _ := os.Create(f)
 	f1.Write([]byte("bad toml file"))
 	f1.Close()
 	_, err = NewConfiguration(f)
