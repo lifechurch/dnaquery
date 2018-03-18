@@ -123,3 +123,38 @@ func TestProcessLine(t *testing.T) {
 	}
 	cleanupFiles(outfile)
 }
+
+func TestReadLine(t *testing.T) {
+	c1 := App{
+		Name:  "ingress-lb",
+		Regex: `^.*$`,
+	}
+	cfg := &Configuration{
+		Apps:    []App{c1},
+		Storage: Storage{LogDirectory: "/tmp/"},
+	}
+	dna, err := NewDNAQuery(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	ch, err := dna.readLine("test_data/testlog")
+	if err == nil {
+		t.Error("expected error for invalid file")
+	}
+	ch, err = dna.readLine("main.go")
+	if err == nil {
+		t.Error("expected error for invalid gzip file")
+	}
+
+	ch, err = dna.readLine("test_data/testlog.json.gz")
+	if err != nil {
+		t.Fatalf("unexpected error in readLine, %v", err)
+	}
+	count := 0
+	for _ = range ch {
+		count += 1
+	}
+	if count != 6 {
+		t.Errorf("Unexpected # of logs found based on config, expected 6 found %v", count)
+	}
+}
