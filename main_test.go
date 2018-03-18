@@ -86,22 +86,30 @@ func TestProcessLine(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
+	err = dna.processLine("", nil)
+	if err == nil {
+		t.Fatal("Expected error for bad filename")
+	}
+
 	ch := make(chan [2]string)
 	outfile := "output.csv"
-	go dna.processLine(outfile, ch)
-	// regular, expect normal operation
-	ch <- [2]string{"app1", `123.123.123.123 [13/Nov/2017:13:23:01 -0000] - "GET view.json" 200`}
-	ch <- [2]string{"app1", `123.123.123.123 [13/Nov/2017:13:23:04 -0000] - "GET ping.json" 200`}
-	ch <- [2]string{"app2", `2.1.5.3 - [2017-12-03T13:23:04-0500] - "GET ping.json" 200`}
-	ch <- [2]string{"app2", `2.1.5.3 - [2017-12-03T13:23:04-0500] - "GET view.json" 200`}
-	// case where exclusion and time groups are more then regex
-	ch <- [2]string{"app3", `2.1.5.3`}
-	// case where there is no app registered
-	ch <- [2]string{"app", `2.1.5.3 - [2017-12-03T13:23:04-0500] - "GET view.json" 200`}
-	// case where the log line doesn't match regex
-	ch <- [2]string{"app1", `error`}
-	close(ch)
-
+	go func(outfile string, ch chan [2]string) {
+		// regular, expect normal operation
+		ch <- [2]string{"app1", `123.123.123.123 [13/Nov/2017:13:23:01 -0000] - "GET view.json" 200`}
+		ch <- [2]string{"app1", `123.123.123.123 [13/Nov/2017:13:23:04 -0000] - "GET ping.json" 200`}
+		ch <- [2]string{"app2", `2.1.5.3 - [2017-12-03T13:23:04-0500] - "GET ping.json" 200`}
+		ch <- [2]string{"app2", `2.1.5.3 - [2017-12-03T13:23:04-0500] - "GET view.json" 200`}
+		// case where exclusion and time groups are more then regex
+		ch <- [2]string{"app3", `2.1.5.3`}
+		// case where there is no app registered
+		ch <- [2]string{"app", `2.1.5.3 - [2017-12-03T13:23:04-0500] - "GET view.json" 200`}
+		// case where the log line doesn't match regex
+		ch <- [2]string{"app1", `error`}
+		// case where time format does not match, should just skip over
+		ch <- [2]string{"app1", `123.123.123.123 [13-Nov-2017:13:23:01 -0000] - "GET view.json" 200`}
+		close(ch)
+	}(outfile, ch)
+	err = dna.processLine(outfile, ch)
 	// sleep a bit for goroutine to finish up once channel is closed
 	time.Sleep(500 * time.Millisecond)
 	dat, err := ioutil.ReadFile(outfile)
