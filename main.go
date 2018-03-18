@@ -21,7 +21,7 @@ import (
 	"google.golang.org/api/option"
 )
 
-var version = "0.3.0"
+var version = "0.3.1"
 
 // DNAQuery holds config and derived data
 type DNAQuery struct {
@@ -56,24 +56,22 @@ func cleanupFiles(path ...string) {
 	}
 }
 
-func (d *DNAQuery) readLine(path string) chan [2]string {
+func (d *DNAQuery) readLine(path string) (chan [2]string, error) {
+	log.Println("Opening Logfile", path)
+	inFile, err := os.Open(path)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Unable to open input: %s", path)
+	}
+	gzReader, err := gzip.NewReader(inFile)
+	if err != nil {
+		return nil, errors.Wrap(err, "Unable to create gzip reader")
+	}
 	ch := make(chan [2]string, 50)
-	go func(path string, ch chan [2]string) {
+	go func(inFile io.ReadCloser, ch chan [2]string) {
 		defer close(ch)
-		log.Println("Opening Logfile", path)
-		inFile, err := os.Open(path)
-		if err != nil {
-			log.Fatalf("Unable to open input: %s", path)
-		}
-		gz, err := gzip.NewReader(inFile)
-
-		if err != nil {
-			log.Fatal(err)
-		}
 		defer inFile.Close()
-		defer gz.Close()
 
-		scanner := bufio.NewScanner(gz)
+		scanner := bufio.NewScanner(inFile)
 		log.Println("Scanning log file")
 		lineCount := 0
 		for scanner.Scan() {
@@ -86,11 +84,11 @@ func (d *DNAQuery) readLine(path string) chan [2]string {
 			}
 		}
 		if err := scanner.Err(); err != nil {
-			log.Fatalln("Error reading log file:", err.Error())
+			log.Fatalf("Error reading log file: %v", err)
 		}
 		log.Printf("Scanning complete. %d lines scanned\n", lineCount)
-	}(path, ch)
-	return ch
+	}(gzReader, ch)
+	return ch, nil
 }
 
 func (d *DNAQuery) processLine(path string, ch chan [2]string) error {
@@ -312,7 +310,8 @@ func run(c *cli.Context) error {
 		defer cleanupFiles(logName)
 	}
 
-	ch := dna.readLine(logName)
+	ch, err := dna.readLine(logName)
+	CheckErr("Error: ", err)
 
 	outFile := "results_" + dateToProcess + ".csv"
 	outPath := filepath.Join(cfg.Storage.LogDirectory, outFile)
