@@ -314,13 +314,17 @@ func run(c *cli.Context) error {
 	CheckErr("Error: ", err)
 
 	logName := dna.getLogfile(dateToProcess)
-	defer cleanupFiles(logName)
+	if !c.Bool("keep") {
+		defer cleanupFiles(logName)
+	}
 
 	ch := dna.readLine(logName)
 
 	outFile := "results_" + dateToProcess + ".csv"
 	outPath := filepath.Join(cfg.Storage.LogDirectory, outFile)
-	defer cleanupFiles(outPath)
+	if !c.Bool("keep") {
+		defer cleanupFiles(outPath)
+	}
 	dna.processLine(outPath, ch)
 
 	gcsObject := dateToProcess + "_results.csv"
@@ -328,6 +332,11 @@ func run(c *cli.Context) error {
 	CheckErr("Error uploading to GCS:", err)
 
 	dna.loadInBQ(gcsObject, dateToProcess)
+
+	if c.Bool("keep") {
+		log.Printf("Log file not removed: %s", logName)
+		log.Printf("Results file not removed: %s", outPath)
+	}
 
 	return nil
 }
@@ -344,6 +353,10 @@ func main() {
 		cli.StringFlag{
 			Name:  "date, d",
 			Usage: "process log archive for `YYYY-MM-DD`",
+		},
+		cli.BoolFlag{
+			Name:  "keep, k",
+			Usage: "flag to keep log files after run, helpful during configuration",
 		},
 	}
 	app.Action = run
