@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [0.3.0] - 2018-03-09
 ### Changes
 - `containers` in the config file is renamed to `apps` in order to be more flexible
+- remove `_` from BigQuery table names to comply with BigQuery recommendations.
 
 ## [0.2.0] - 2018-02-15
 ### Added
