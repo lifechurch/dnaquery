@@ -250,7 +250,7 @@ func (d *DNAQuery) uploadToGCS(path string, object string) error {
 }
 
 func (d *DNAQuery) loadInBQ(object string, date string) {
-	date = strings.Replace(date, "-", "_", -1)
+	date = strings.Replace(date, "-", "", -1)
 	log.Println("Starting load into BQ")
 	ctx := context.Background()
 
