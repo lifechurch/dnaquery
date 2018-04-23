@@ -21,7 +21,7 @@ import (
 	"google.golang.org/api/option"
 )
 
-var version = "0.3.2"
+var version = "0.3.1"
 
 // DNAQuery holds config and derived data
 type DNAQuery struct {
