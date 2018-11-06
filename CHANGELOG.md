@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Changes
+- update to go modules 
+
 ## [0.3.1] - 2018-04-23
 ### Changes
 - remove `_` from BigQuery table names to comply with BigQuery recommendations.
