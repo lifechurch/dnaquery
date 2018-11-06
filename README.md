@@ -9,7 +9,7 @@ DNAQuery is a command line utility to take [LogDNA](https://logdna.com) archives
 
 `go get -u github.com/lifechurch/dnaquery`
 
-DNAQuery has been tested on Go v1.9
+DNAQuery has been tested on Go v1.11
 
 ## Prerequisites
 
