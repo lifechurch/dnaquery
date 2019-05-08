@@ -77,9 +77,9 @@ func (d *DNAQuery) readLine(path string) (chan [2]string, error) {
 		for scanner.Scan() {
 			lineCount++
 			data := scanner.Bytes()
-			app, _ := jsonparser.GetString(data, "_app")
+			app, _ := jsonparser.GetString(data, "_source", "_app")
 			if _, ok := d.appNames[app]; ok {
-				line, _ := jsonparser.GetString(data, "_line")
+				line, _ := jsonparser.GetString(data, "_source", "_line")
 				ch <- [2]string{app, line}
 			}
 		}
