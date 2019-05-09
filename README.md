@@ -53,6 +53,7 @@ Dataset = "logdna" # BigQuery dataset
 TemplateTable = "logdna" # currently DNAQuery uses a template table. More details below.
 LogBucket = "logs" # name of bucket set in LogDNA archive setup above
 LogPrefix = "a7112abc9d" # each archive file starts with a prefix specific to your LogDNA account
+LogPostfix = "23" # number appended to your LogDNA archives between the archive date and file extension
 ```
 
 #### TemplateTable
