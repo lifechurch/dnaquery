@@ -77,9 +77,9 @@ func (d *DNAQuery) readLine(path string) (chan [2]string, error) {
 		for scanner.Scan() {
 			lineCount++
 			data := scanner.Bytes()
-			app, _ := jsonparser.GetString(data, "_app")
+			app, _ := jsonparser.GetString(data, "_source", "_app")
 			if _, ok := d.appNames[app]; ok {
-				line, _ := jsonparser.GetString(data, "_line")
+				line, _ := jsonparser.GetString(data, "_source", "_line")
 				ch <- [2]string{app, line}
 			}
 		}
@@ -153,6 +153,7 @@ func (d *DNAQuery) processLine(path string, ch chan [2]string) error {
 
 func (d *DNAQuery) getLogfile(logDate string) (logName string) {
 	logName = d.GCP.LogPrefix + "." + logDate + ".json.gz"
+	gcpLogName := d.GCP.LogPrefix + "." + logDate + "." + d.GCP.LogPostfix + ".json.gz"
 	localLogName := filepath.Join(d.Storage.LogDirectory, logName)
 
 	os.Setenv("GOOGLE_CLOUD_PROJECT", d.GCP.ProjectID)
@@ -161,7 +162,8 @@ func (d *DNAQuery) getLogfile(logDate string) (logName string) {
 	CheckErr("Error creating storage client: ", err)
 	bkt := client.Bucket(d.GCP.LogBucket)
 
-	obj := bkt.Object(logName)
+	log.Printf("Downloading GCP file %q", gcpLogName)
+	obj := bkt.Object(gcpLogName)
 	objAttrs, err := obj.Attrs(ctx)
 	CheckErr("Error getting object attrs: ", err)
 	sizeInGCS := objAttrs.Size
@@ -176,7 +178,7 @@ func (d *DNAQuery) getLogfile(logDate string) (logName string) {
 	}
 
 	if downloadFile {
-		log.Printf("Downloading from GCS")
+		log.Printf("Saving to local file %q", localLogName)
 
 		file, err := os.Create(localLogName)
 		if err != nil {

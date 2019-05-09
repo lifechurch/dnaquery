@@ -27,6 +27,7 @@ type GCP struct {
 	TemplateTable   string
 	LogPrefix       string
 	LogBucket       string
+	LogPostfix      string
 }
 
 // Exclude holds the configuration for the [[apps.excludes]] subsection
